@@ -1,0 +1,37 @@
+_Collected_data_Static_test27.csv数据在两种求解算法下的结果
+
+cv::CALIB_ROBOT_WORLD_HAND_EYE_SHAH：
+标定误差（_Collected_data_Staticabc.csv）：
+Average Translation Error: 5.32994
+Max Translation Error: 13.1571
+Min Translation Error: 3.2261
+Average Rotation Error: 4.12529
+Max Rotation Error: 9.63807
+Min Rotation Error: 1.70882
+
+定位误差（_Collected_data_Static_test27.csv）
+Average Translation Error: 6.06021
+Max Translation Error: 10.5079
+Min Translation Error: 2.25113
+Average Rotation Error: 4.20936
+Max Rotation Error: 16.2919
+Min Rotation Error: 1.92217
+
+
+
+cv::CALIB_ROBOT_WORLD_HAND_EYE_LI：
+标定误差（_Collected_data_Staticabc.csv）：
+Average Translation Error: 6.06005
+Max Translation Error: 14.6462
+Min Translation Error: 2.9373
+Average Rotation Error: 4.48687
+Max Rotation Error: 11.1051
+Min Rotation Error: 0.964554
+
+定位误差（_Collected_data_Static_test27.csv）
+Average Translation Error: 5.55492
+Max Translation Error: 9.99158
+Min Translation Error: 1.62412
+Average Rotation Error: 4.20527
+Max Rotation Error: 16.1219
+Min Rotation Error: 1.90036
