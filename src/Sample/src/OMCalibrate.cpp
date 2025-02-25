@@ -5,23 +5,26 @@
 
 OMCalibrate::OMCalibrate()
 {
-	std::string filename1 = "D:/Optomagnetic-tracking/OpticalMagneticNavigation/results/Vega_Collected_data_Staticabc.csv";
-	std::string filename2 = "D:/Optomagnetic-tracking/OpticalMagneticNavigation/results/Aurora_Collected_data_Staticabc.csv";
-	//std::cout << "M1 data" << std::endl;
 	
-	ReadRecordData(this->M1_data, filename1,50, 12, 9);
+	std::string filename1 = "D:/Optomagnetic-tracking/OpticalMagneticNavigation/results/Vega_60.csv";
+	std::string filename2 = "D:/Optomagnetic-tracking/OpticalMagneticNavigation/results/Aurora_60.csv";
+	//std::cout << "M1 data" << std::endl;
+
+	int group = 60;
+	
+	ReadRecordData(this->M1_data, filename1,group, 12, 9);
 	
 	Quat2Matrices(M1_data);
 	//PrintTrackedData(this->M1_data);
 	
 
 	//std::cout << "M2  data" << std::endl;
-	ReadRecordData(this->M2_data, filename1,50, 12, 41);
+	ReadRecordData(this->M2_data, filename1,group, 12, 41);
 	Quat2Matrices(M2_data);
 	//PrintTrackedData(this->M2_data);
 
 	//std::cout << "EMSensor  data" << std::endl;
-	ReadRecordData(this->EMSensor_data, filename2,50, 12, 9);
+	ReadRecordData(this->EMSensor_data, filename2,group, 12, 9);
 	Quat2Matrices(EMSensor_data);
 	//PrintTrackedData(this->EMSensor_data);
 
@@ -52,9 +55,10 @@ OMCalibrate::OMCalibrate()
 	}
 	
 	
-	//M2_2M1数据
+	//M2_2M1、M1_2M2数据
 	for (int i = 0; i < Marker1_2Vega.size(); i++) {
 		cv::Mat Rt;
+		cv::Mat Rt2;
 		Rt = Vega_2Marker1[i] * Marker2_2Vega[i];
 		
 
@@ -67,8 +71,18 @@ OMCalibrate::OMCalibrate()
 		Marker2_2Marker1.push_back(Rt);
 		R_Marker2_2Marker1.push_back(R);
 		t_Marker2_2Marker1.push_back(t);
+
+		Rt2= Vega_2Marker2[i] * Marker1_2Vega[i];
+		Marker1_2Marker2.push_back(Rt2);
 	}
 	
+
+	saveVectorMatToTxt(Marker2_2Marker1, "Marker2_2Marker1.txt");
+	saveVectorMatToTxt(Marker1_2Marker2, "Marker1_2Marker2.txt");
+	saveVectorMatToTxt(EMsensor_2Aurora, "EMsensor_2Aurora.txt");
+	saveVectorMatToTxt(Aurora_2EMsensor,"Aurora_2EMsensor.txt");
+	saveVectorMatToTxt(Marker1_2Vega, "Marker1_2Vega.txt");
+	saveVectorMatToTxt(Marker2_2Vega, "Marker2_2Vega.txt");
 	
 
 }
@@ -453,6 +467,27 @@ cv::Mat OMCalibrate::createTransformationMatrix(const cv::Mat& R, const cv::Mat&
 	transformMatrix.at<double>(3, 3) = 1.0; // 齐次坐标最后一行
 
 	return transformMatrix;
+}
+
+void OMCalibrate::saveVectorMatToTxt(const std::vector<cv::Mat>& matrices, const std::string& filename) {
+	std::ofstream file(filename);
+	if (!file.is_open()) {
+		std::cerr << "Failed to open file: " << filename << std::endl;
+		return;
+	}
+
+	for (size_t i = 0; i < matrices.size(); ++i) {
+		file << "Matrix " << i + 1 << " (" << matrices[i].rows << "x" << matrices[i].cols << "):\n";
+		for (int row = 0; row < matrices[i].rows; ++row) {
+			for (int col = 0; col < matrices[i].cols; ++col) {
+				file << matrices[i].at<double>(row, col) << " ";  // Assume double precision
+			}
+			file << "\n";
+		}
+		file << "\n";  // Separate matrices with an empty line
+	}
+
+	file.close();
 }
 
 

@@ -1047,7 +1047,7 @@ void calibrateCollection(std::string fileName1, std::string fileName2, int numbe
 
 	for (int i = 0; i < numberOfgroup; i++)
 	{
-		std::this_thread::sleep_for(std::chrono::milliseconds(3000));
+		std::this_thread::sleep_for(std::chrono::milliseconds(1000));
 		int linesWritten = 0;
 		while (linesWritten < numberOfLines)
 		{
@@ -1232,7 +1232,7 @@ void connectAndRecord(const std::string& deviceName, const std::string& toolFile
  *          arg(2+) - (optional) Specify options such as: --encrypted, --scu=[scu_hostname], --tools=[file1.rom],[file2.rom]
  */
 //如果命令行是 sample.exe 169.254.8.50 --tools=example.rom，则 argc 为 3，argv 中的内容依次为 {"sample.exe", "169.254.8.50", "--tools=example.rom"}
-int main1(int argc, char* argv[])
+int main5(int argc, char* argv[])
 //原始main函数
 {
     // Print help information if the user has not specified any arguments
@@ -1499,7 +1499,7 @@ int main1(int argc, char* argv[])
 //}
 
 
-int main11(int argc, char* argv[]) {
+int main(int argc, char* argv[]) {
 	if (argc < 6) {
 		std::cerr << "Usage: sample.exe <device1> <tool1.rom> <tool3.rom> <device2> <tool2.rom>" << std::endl;
 		return -1;
@@ -1624,8 +1624,8 @@ int main11(int argc, char* argv[]) {
 	//writeCSV_with_free_point("Vega_with_free_point.csv", "combined_Aurora.csv",50);
 
 	//光磁标定数据的采集
-	//calibrateCollection("Vega_Collected_data_25.csv", "Aurora_Collected_data_25.csv", 25, 10);
-	StaticCalibrateCollection("NDI_test2.csv", "A_test2.csv", 50, 10);
+	//calibrateCollection("Vega_Collected_data_200.csv", "Aurora_Collected_data_200.csv", 20, 10);
+	StaticCalibrateCollection("Vega_60.csv", "Aurora_60.csv", 60, 10);
 
 	onErrorPrintDebugMessage1("capi1.stopTracking()", capi1.stopTracking());
 	onErrorPrintDebugMessage1("capi2.stopTracking()", capi2.stopTracking());

@@ -36,6 +36,8 @@ public:
 	
 	void PrintTrackedData(const std::vector<TrackedData>& m_data);
 
+	void saveVectorMatToTxt(const std::vector<cv::Mat>& matrices, const std::string& filename);
+
 
 
 //private:
@@ -57,6 +59,8 @@ public:
 	std::vector<cv::Mat> R_Marker2_2Marker1;
 	std::vector<cv::Mat> t_Marker2_2Marker1;
 	std::vector<cv::Mat> Marker2_2Marker1;
+
+	std::vector<cv::Mat> Marker1_2Marker2;
 
 
 	cv::Mat R_EMsensor_2Marker1;  //´ıÇó×ª»»¾ØÕó
