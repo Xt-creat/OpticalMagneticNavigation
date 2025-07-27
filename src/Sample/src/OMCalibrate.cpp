@@ -6,11 +6,11 @@
 OMCalibrate::OMCalibrate()
 {
 	
-	std::string filename1 = "D:/Optomagnetic-tracking/OpticalMagneticNavigation/results/Vega_60.csv";
-	std::string filename2 = "D:/Optomagnetic-tracking/OpticalMagneticNavigation/results/Aurora_60.csv";
+	std::string filename1 = "Aurora.csv";
+	std::string filename2 = "Vega.csv";
 	//std::cout << "M1 data" << std::endl;
 
-	int group = 60;
+	int group = 30;
 	
 	ReadRecordData(this->M1_data, filename1,group, 12, 9);
 	
@@ -27,6 +27,10 @@ OMCalibrate::OMCalibrate()
 	ReadRecordData(this->EMSensor_data, filename2,group, 12, 9);
 	Quat2Matrices(EMSensor_data);
 	//PrintTrackedData(this->EMSensor_data);
+
+	//读取
+	ReadMarkers(M1_markers,filename1,30,12);
+
 
 	GetRt();
 
@@ -383,6 +387,72 @@ void OMCalibrate::ReadRecordData(std::vector<TrackedData>& m_data,const std::str
 		++dataCount;
 	}
 
+}
+
+void OMCalibrate::ReadMarkers(std::vector<std::vector<std::vector<double>>>& data,
+	const std::string& filename,
+	int groups,
+	int interval)
+{
+	std::ifstream file(filename);
+	std::string line;
+
+	if (!file.is_open()) {
+		std::cerr << "Error opening file: " << filename << std::endl;
+		return;
+	}
+
+	// 跳过前6行
+	for (int i = 0; i < 6; ++i) {
+		std::getline(file, line);
+	}
+
+	int dataCount = 0;
+
+	while (dataCount < groups) {
+		if (!std::getline(file, line)) break;
+
+		std::stringstream ss(line);
+		std::string cell;
+		std::vector<std::string> allCells;
+
+		// 分割整行为字符串数组
+		while (std::getline(ss, cell, ',')) {
+			allCells.push_back(cell);
+		}
+
+		std::vector<std::vector<double>> oneGroup;
+
+		// 要提取的4组三元组起始索引
+		std::vector<int> startCols = { 18, 22, 26, 30 };
+
+		for (int start : startCols) {
+			std::vector<double> marker;
+			for (int j = 0; j < 3; ++j) {
+				int col = start + j;
+				if (col < allCells.size()) {
+					try {
+						marker.push_back(std::stod(allCells[col]));
+					}
+					catch (...) {
+						marker.push_back(0.0); // 转换失败填0
+					}
+				}
+				else {
+					marker.push_back(0.0); // 越界填0
+				}
+			}
+			oneGroup.push_back(marker);
+		}
+
+		data.push_back(oneGroup);
+		++dataCount;
+
+		// 跳过 interval - 1 行（因为当前已经读了1行）
+		for (int i = 0; i < interval - 1; ++i) {
+			std::getline(file, line);
+		}
+	}
 }
 
 

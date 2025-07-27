@@ -43,3 +43,4 @@ private:
 	int m_SleepMs;
 };
 #endif //__LOADCAPTUREUS_H__
+

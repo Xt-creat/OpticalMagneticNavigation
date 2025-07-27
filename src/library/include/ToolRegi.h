@@ -10,8 +10,6 @@
 #include <string>
 #include <math.h>
 
-
-
 struct TrackingData
 {
 	std::string name = "";

@@ -2,6 +2,9 @@ set(CMAKE_AUTOMOC ON) # 自动生成moc_*.cpp文件, 连接Qt的信号槽函数
 set(CMAKE_AUTORCC ON) # 自动处理qrc文件, 加载图片等资源
 set(CMAKE_AUTOUIC ON) # 根据*.ui文件自动生成ui_*.h头文件
 
+# 让 AutoUic 也去 src/ 找 ui 文件
+set(CMAKE_AUTOUIC_SEARCH_PATHS ${CMAKE_CURRENT_SOURCE_DIR}/src)
+
 # 设置源文件
 file(GLOB SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp")
 file(GLOB HEADERS "${CMAKE_CURRENT_SOURCE_DIR}/include/*.h")
@@ -10,6 +13,8 @@ file(GLOB UI_FILES "${CMAKE_CURRENT_SOURCE_DIR}/src/*.ui")
 # 打印验证
 message(STATUS "Source files: ${SOURCES}")
 message(STATUS "Header files: ${HEADERS}")
+
+set(VTK_DIR " D:/Env/VTK9.4/install/lib/cmake/vtk-9.4")
 
 # 定义可执行文件目标
 add_executable(Qt_Interface ${SOURCES} ${HEADERS} ${UI_FILES})
@@ -27,17 +32,49 @@ target_link_libraries(Qt_Interface PUBLIC Library)
 # OpenCV 4.5到4.10版本, 仅CMake3.26以上支持按照版本区间的查找
 find_package(OpenCV 4.5...4.10 REQUIRED)
 
+# VTK 8.1到9.5版本
+find_package(VTK 8.1...9.5 REQUIRED )
+message(STATUS "VTK Libraries: ${VTK_LIBRARIES}")
+
 # 查找 Qt5 必需模块
 find_package(Qt5 COMPONENTS Widgets Core Gui REQUIRED)
+
+#查找VTK必须模块
+find_package(VTK 9.4 COMPONENTS
+	RenderingOpenGL2
+	RenderingGL2PSOpenGL2
+	IOGeometry
+	GUISupportQt
+	InteractionWidgets
+	InteractionStyle
+	IOImage
+	IOPLY
+	RenderingAnnotation
+	RenderingFreeType
+	RenderingCore
+	FiltersGeometry
+	FiltersSources
+	FiltersGeneral
+    	FiltersModeling
+	FiltersCore
+	CommonExecutionModel
+	CommonDataModel
+	CommonTransforms
+	CommonMath
+	CommonCore
+	CommonColor
+)
 
 # 更为推荐的是使用target_include_directories, 这样能灵活控制哪个项目需要哪些库
 target_include_directories(Qt_Interface PUBLIC
     ${OPENCV_INCLUDE_DIR}
+    ${VTK_INCLUDE_DIRS}
 )
 
 # 为工程添加静态链接库, 库里面是上文include头文件声明函数的具体实现
 target_link_libraries(Qt_Interface PUBLIC
     ${OpenCV_LIBS} 
+    ${VTK_INCLUDE_DIRS}
     Qt5::Core
     Qt5::Gui
     Qt5::Widgets

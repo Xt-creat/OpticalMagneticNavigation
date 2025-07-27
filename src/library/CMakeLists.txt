@@ -12,6 +12,8 @@ set_target_properties(Library PROPERTIES
     DEFINE_SYMBOL CAPICOMMON_EXPORTS # 设置自定义导出宏
 )
 
+set(VTK_DIR " D:/Env/VTK9.4/install/lib/cmake/vtk-9.4")
+
 # 设置源文件和头文件路径
 file(GLOB SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp")
 file(GLOB HEADERS 
@@ -26,10 +28,20 @@ message(STATUS "Header files: ${HEADERS}")
 # 添加源文件和头文件到库目标
 target_sources(Library PRIVATE ${SOURCES} ${HEADERS})
 
+
+# OpenCV 4.5到4.10版本, 仅CMake3.26以上支持按照版本区间的查找
+find_package(OpenCV 4.5...4.10 REQUIRED)
+
+# VTK 8.1到9.5版本
+find_package(VTK 8.1...9.5 REQUIRED )
+message(STATUS "VTK Libraries: ${VTK_LIBRARIES}")
+
 # 设置头文件目录
 target_include_directories(Library PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${CMAKE_CURRENT_SOURCE_DIR}/src/include
+    ${VTK_INCLUDE_DIRS}
+    ${PCL_INCLUDE_DIRS}
 )
 
 # 可选：设置输出目录
@@ -55,6 +67,11 @@ endif()
 #    pthread  # 线程支持
 #    crypto   # OpenSSL 加密库
 #)
+
+target_link_libraries(Library PUBLIC
+    ${OpenCV_LIBS} 
+    ${VTK_LIBRARIES}
+)
 
 # 自定义清理目标（可选）
 add_custom_target(clean-all

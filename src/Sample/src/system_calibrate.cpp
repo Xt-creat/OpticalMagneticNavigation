@@ -23,6 +23,12 @@
 #include <vtkProperty.h>
 #include <vtkAutoInit.h> // 必须添加此头文件
 #include <Eigen/Dense> // For Vector3d
+#include <random>
+#include <algorithm>
+
+#include "ToolRegi.h"
+
+
 using namespace Eigen;
 using Vector3d = Eigen::Vector3d;
 
@@ -31,25 +37,28 @@ using Vector3d = Eigen::Vector3d;
 VTK_MODULE_INIT(vtkInteractionStyle); // 手动初始化交互模块
 VTK_MODULE_INIT(vtkRenderingOpenGL2); // 如果需要渲染，也初始化 OpenGL
 
-// 将cv::Mat旋转矩阵转换为欧拉角
-Vector3d rotationMatrixToEulerAngles(const cv::Mat& rotationMatrix) {
+// 将cv::Mat旋转误差矩阵转换为角度误差
+double rotationMatrixToAngleError(const cv::Mat& rotationMatrix) {
 	// 确保输入是3x3的旋转矩阵
 	if (rotationMatrix.rows != 3 || rotationMatrix.cols != 3) {
 		throw std::invalid_argument("Input must be a 3x3 rotation matrix.");
 	}
 
 	// 将cv::Mat转换为Eigen的旋转矩阵
-	Matrix3d R;
+	Eigen::Matrix3d R;
 	for (int i = 0; i < 3; ++i) {
 		for (int j = 0; j < 3; ++j) {
 			R(i, j) = rotationMatrix.at<double>(i, j);
 		}
 	}
 
-	// 从旋转矩阵计算欧拉角
-	Vector3d eulerAngles = R.eulerAngles(2, 1, 0); // ZYX顺序
-	return eulerAngles * (180.0 / M_PI); // 转换为度
+	// 使用 AngleAxis 提取旋转角度
+	Eigen::AngleAxisd angleAxis(R);
+	double angleInDegrees = angleAxis.angle() * (180.0 / M_PI);
+
+	return angleInDegrees;
 }
+
 
 
 // 函数：提取平移向量并将其作为点云返回
@@ -321,7 +330,91 @@ void calculateRegistrationError(const std::vector<Vector3d>& T1,
 	std::cout << "Max Error: " << maxError << "\n";
 }
 
-void ErrorMetric1(const OMCalibrate& OMC, const cv::Mat RecordEMsensor_2Marker1, cv::Mat RecordEM_2Marker2) {
+
+
+//void ErrorMetric1(const OMCalibrate& OMC, const cv::Mat RecordEMsensor_2Marker1, cv::Mat RecordEM_2Marker2) {
+//	//Methods for Simultaneous Robot-World-Hand--Eye Calibration- A Comparative Study
+//	cv::Mat RecordMarker1_2EMsensor;
+//	cv::invert(RecordEMsensor_2Marker1, RecordMarker1_2EMsensor, cv::DECOMP_SVD);
+//
+//	cv::Mat RecordMarker2_2EM;
+//	cv::invert(RecordEM_2Marker2, RecordMarker2_2EM, cv::DECOMP_SVD);
+//
+//	cv::Mat Marker1_2EMsensor;
+//	cv::invert(OMC.EMsensor_2Marker1, Marker1_2EMsensor, cv::DECOMP_SVD);
+//
+//	cv::Mat output_Marker1_2Vega;
+//	cv::Mat Marker1_2Aurora_Path1;
+//	cv::Mat Marker1_2Aurora_Path2;
+//
+//	std::vector<Vector3d> T1;
+//	std::vector<Vector3d> T2;
+//
+//
+//	std::vector<double> TranslationError;
+//	std::vector<double> RotationError;
+//
+//	for (int i = 0; i < OMC.R_Marker1_2Vega.size(); i++) {
+//		//验证标定的固定变换矩阵在其他数据集可用
+//		output_Marker1_2Vega = OMC.Marker2_2Vega[i] * RecordEM_2Marker2 * OMC.EMsensor_2Aurora[i] * RecordMarker1_2EMsensor;
+//
+//
+//		//计算的器械位姿
+//		std::cout << "Group" << i + 1 << std::endl;
+//		std::cout << std::endl;
+//		std::cout << "output_Marker1_2Vega" << output_Marker1_2Vega << std::endl;
+//		std::cout << std::endl;
+//		Vector3d translationOutput;
+//		translationOutput << output_Marker1_2Vega.at<double>(0, 3), output_Marker1_2Vega.at<double>(1, 3), output_Marker1_2Vega.at<double>(2, 3);
+//		std::cout << "Translation Vector: " << translationOutput.transpose() << std::endl;
+//		std::cout << std::endl;
+//		cv::Mat rotationMatrix = output_Marker1_2Vega(cv::Rect(0, 0, 3, 3));
+//		Vector3d eulerAnglesOutput = rotationMatrixToEulerAngles(rotationMatrix);
+//		std::cout << "Euler Angles (degrees): " << eulerAnglesOutput.transpose() << std::endl;
+//		std::cout << std::endl;
+//
+//		//真实的器械位姿
+//		std::cout << "truth_Marker1_2Vega" << OMC.Marker1_2Vega[i] << std::endl;
+//		std::cout << std::endl;
+//		std::cout << "Translation: " << OMC.t_Marker1_2Vega[i] << std::endl;
+//		std::cout << std::endl;
+//		Vector3d translationTruth;
+//		translationTruth << OMC.Marker1_2Vega[i].at<double>(0, 3), OMC.Marker1_2Vega[i].at<double>(1, 3), OMC.Marker1_2Vega[i].at<double>(2, 3);
+//		Vector3d eulerAnglesTruth = rotationMatrixToEulerAngles(OMC.R_Marker1_2Vega[i]);
+//		std::cout << "Euler Angles (degrees): " << eulerAnglesTruth.transpose() << std::endl;
+//		std::cout << std::endl;
+//
+//		//计算平移误差和旋转误差
+//		double DistanceError = (translationOutput - translationTruth).norm();
+//		std::cout << "DistanceError " << DistanceError << std::endl;
+//		TranslationError.push_back(DistanceError);
+//		double AngleError = (eulerAnglesOutput - eulerAnglesTruth).norm();
+//		RotationError.push_back(AngleError);
+//		std::cout << "AngleError " << AngleError << std::endl;
+//
+//	}
+//
+//	//// 计算 TranslationError 的Mean/Min/Max
+//	double translationErrorMean = std::accumulate(TranslationError.begin(), TranslationError.end(), 0.0) / TranslationError.size();
+//	std::cout << "Average Translation Error: " << translationErrorMean << std::endl;
+//	double maxTranslationError = *std::max_element(TranslationError.begin(), TranslationError.end());
+//	double minTranslationError = *std::min_element(TranslationError.begin(), TranslationError.end());
+//	std::cout << "Max Translation Error: " << maxTranslationError << std::endl;
+//	std::cout << "Min Translation Error: " << minTranslationError << std::endl;
+//
+//	// 计算 RotationError 的Mean/Min/Max
+//	double rotationErrorMean = std::accumulate(RotationError.begin(), RotationError.end(), 0.0) / RotationError.size();
+//	std::cout << "Average Rotation Error: " << rotationErrorMean << std::endl;
+//	double maxRotationError = *std::max_element(RotationError.begin(), RotationError.end());
+//	double minRotationError = *std::min_element(RotationError.begin(), RotationError.end());
+//	std::cout << "Max Rotation Error: " << maxRotationError << std::endl;
+//	std::cout << "Min Rotation Error: " << minRotationError << std::endl;
+//
+//
+//
+//}
+
+void ErrorMetric2(const OMCalibrate& OMC, const cv::Mat RecordEMsensor_2Marker1, cv::Mat RecordEM_2Marker2) {
 	cv::Mat RecordMarker1_2EMsensor;
 	cv::invert(RecordEMsensor_2Marker1, RecordMarker1_2EMsensor, cv::DECOMP_SVD);
 
@@ -371,9 +464,12 @@ void ErrorMetric1(const OMCalibrate& OMC, const cv::Mat RecordEMsensor_2Marker1,
 		std::cout << "Translation Vector: " << translationOutput.transpose() << std::endl;
 		std::cout << std::endl;
 		cv::Mat rotationMatrix = output_Marker1_2Vega(cv::Rect(0, 0, 3, 3));
-		Vector3d eulerAnglesOutput = rotationMatrixToEulerAngles(rotationMatrix);
-		std::cout << "Euler Angles (degrees): " << eulerAnglesOutput.transpose() << std::endl;
+		//Vector3d eulerAnglesOutput = rotationMatrixToEulerAngles(rotationMatrix);
+		//std::cout << "Euler Angles (degrees): " << eulerAnglesOutput.transpose() << std::endl;
 		std::cout << std::endl;
+		cv::Mat rotationMatrix_inv;
+		cv::invert(rotationMatrix, rotationMatrix_inv, cv::DECOMP_SVD);
+
 
 		//真实的器械位姿
 		std::cout << "truth_Marker1_2Vega" << OMC.Marker1_2Vega[i] << std::endl;
@@ -382,17 +478,24 @@ void ErrorMetric1(const OMCalibrate& OMC, const cv::Mat RecordEMsensor_2Marker1,
 		std::cout << std::endl;
 		Vector3d translationTruth;
 		translationTruth << OMC.Marker1_2Vega[i].at<double>(0, 3), OMC.Marker1_2Vega[i].at<double>(1, 3), OMC.Marker1_2Vega[i].at<double>(2, 3);
-		Vector3d eulerAnglesTruth = rotationMatrixToEulerAngles(OMC.R_Marker1_2Vega[i]);
-		std::cout << "Euler Angles (degrees): " << eulerAnglesTruth.transpose() << std::endl;
+		//Vector3d eulerAnglesTruth = rotationMatrixToEulerAngles(OMC.R_Marker1_2Vega[i]);
+		//std::cout << "Euler Angles (degrees): " << eulerAnglesTruth.transpose() << std::endl;
 		std::cout << std::endl;
 
 		//计算平移误差和旋转误差
 		double DistanceError = (translationOutput - translationTruth).norm();
 		std::cout << "DistanceError " << DistanceError << std::endl;
 		TranslationError.push_back(DistanceError);
-		double AngleError = (eulerAnglesOutput - eulerAnglesTruth).norm();
-		RotationError.push_back(AngleError);
-		std::cout << "AngleError " << AngleError << std::endl;
+
+		cv::Mat delta_R;
+		delta_R = OMC.R_Marker1_2Vega[i] * rotationMatrix_inv;
+
+		std::cout << "delta_R[" << i << "] = " << std::endl << delta_R << std::endl;
+
+		double angleError = rotationMatrixToAngleError(delta_R);
+		RotationError.push_back(angleError);
+
+		std::cout << "AngleError " << angleError << std::endl;
 
 	}
 	//// 计算 TranslationError 的Mean/Min/Max
@@ -412,274 +515,520 @@ void ErrorMetric1(const OMCalibrate& OMC, const cv::Mat RecordEMsensor_2Marker1,
 	std::cout << "Min Rotation Error: " << minRotationError << std::endl;
 }
 
-void ErrorMetric2(const OMCalibrate& OMC, const cv::Mat RecordEMsensor_2Marker1, cv::Mat RecordEM_2Marker2) {
-	//Methods for Simultaneous Robot-World-Hand--Eye Calibration- A Comparative Study
+
+void ErrorCalculate(const OMCalibrate& OMC, std::vector<cv::Mat> estimate) {
+
+	std::vector<double> TranslationError;
+	std::vector<double> RotationError;
+
+	for (int i = 0; i < OMC.R_Marker1_2Vega.size(); i++) {
+	
+		//计算的器械位姿分解
+		Vector3d translationOutput;
+		translationOutput << estimate[i].at<double>(0, 3), estimate[i].at<double>(1, 3), estimate[i].at<double>(2, 3);
+		cv::Mat rotationMatrix = estimate[i](cv::Rect(0, 0, 3, 3));
+		cv::Mat rotationMatrix_inv;
+		cv::invert(rotationMatrix, rotationMatrix_inv, cv::DECOMP_SVD);
+
+		//真实的器械位姿
+		Vector3d translationTruth;
+		translationTruth << OMC.Marker1_2Vega[i].at<double>(0, 3), OMC.Marker1_2Vega[i].at<double>(1, 3), OMC.Marker1_2Vega[i].at<double>(2, 3);
+
+		//计算平移误差和旋转误差
+		double DistanceError = (translationOutput - translationTruth).norm();
+		//std::cout << "DistanceError[" << i << "] = " << DistanceError << std::endl;
+		TranslationError.push_back(DistanceError);
+
+		cv::Mat delta_R;
+		delta_R = OMC.R_Marker1_2Vega[i] * rotationMatrix_inv;
+
+		//std::cout << "delta_R[" << i << "] = " << std::endl << delta_R << std::endl;
+
+		double angleError = rotationMatrixToAngleError(delta_R);
+		RotationError.push_back(angleError);
+
+		//std::cout << "AngleError " << angleError << std::endl;
+	}
+	//// 计算 TranslationError 的Mean/Min/Max
+	double translationErrorMean = std::accumulate(TranslationError.begin(), TranslationError.end(), 0.0) / TranslationError.size();
+	std::cout << "Average Translation Error: " << translationErrorMean << std::endl;
+	double maxTranslationError = *std::max_element(TranslationError.begin(), TranslationError.end());
+	double minTranslationError = *std::min_element(TranslationError.begin(), TranslationError.end());
+	std::cout << "Max Translation Error: " << maxTranslationError << std::endl;
+	std::cout << "Min Translation Error: " << minTranslationError << std::endl;
+
+	// 计算 RotationError 的Mean/Min/Max
+	double rotationErrorMean = std::accumulate(RotationError.begin(), RotationError.end(), 0.0) / RotationError.size();
+	std::cout << "Average Rotation Error: " << rotationErrorMean << std::endl;
+	double maxRotationError = *std::max_element(RotationError.begin(), RotationError.end());
+	double minRotationError = *std::min_element(RotationError.begin(), RotationError.end());
+	std::cout << "Max Rotation Error: " << maxRotationError << std::endl;
+	std::cout << "Min Rotation Error: " << minRotationError << std::endl;
+
+}
+
+void CompleteEstimate(const OMCalibrate& OMC, const cv::Mat RecordEMsensor_2Marker1, cv::Mat RecordEM_2Marker2, std::vector<std::vector<std::vector<double>>>& M1_markersEst) {
+	//生成估计的Marker坐标
+
+	std::vector<std::vector<double>> tool = { {0.0,0.0,0.0 },{0.0,28.59,41.02},{0.0,0.0,88.00},{0.0,-44.32,40.45} };
+	
+	cv::Mat RecordMarker1_2EMsensor;
+	cv::invert(RecordEMsensor_2Marker1, RecordMarker1_2EMsensor, cv::DECOMP_SVD);
+
+	cv::Mat RecordMarker2_2EM;
+	cv::invert(RecordEM_2Marker2, RecordMarker2_2EM, cv::DECOMP_SVD);
+
+	cv::Mat Marker1_2EMsensor;
+	cv::invert(OMC.EMsensor_2Marker1, Marker1_2EMsensor, cv::DECOMP_SVD);
+
+	cv::Mat output_Marker1_2Vega;
+
+	for (int i = 0; i < OMC.R_Marker1_2Vega.size(); i++) {
+		output_Marker1_2Vega = OMC.Marker2_2Vega[i] * RecordEM_2Marker2 * OMC.EMsensor_2Aurora[i] * RecordMarker1_2EMsensor;
+
+		std::vector<std::vector<double>> oneGroup;
+
+		for (const auto& pt : tool) {
+			cv::Mat point = (cv::Mat_<double>(4, 1) << pt[0], pt[1], pt[2], 1.0);
+			cv::Mat transformed = output_Marker1_2Vega * point;
+
+			std::vector<double> transformedPoint = {
+				transformed.at<double>(0, 0),
+				transformed.at<double>(1, 0),
+				transformed.at<double>(2, 0)
+			};
+
+			oneGroup.push_back(transformedPoint);
+		}
+
+		M1_markersEst.push_back(oneGroup);
+	}
+
+	
+}
+
+void CreateMixedMarkersN(const OMCalibrate& OMC,
+	const std::vector<std::vector<std::vector<double>>>& M1_markersEst,
+	std::vector<std::vector<std::vector<double>>>& M1_mixedMarkers,
+	int numToReplace) // 替换个数：1, 2, or 3
+{
+	//随机用M1_markersEst的1/2/3个Marker取代OMC.M1_markers的相应位置，并另存在3个变量中
+	std::random_device rd;
+	std::mt19937 gen(rd());
+	int groupCount = std::min((int)OMC.M1_markers.size(), (int)M1_markersEst.size());
+
+	M1_mixedMarkers = OMC.M1_markers;
+
+	for (int i = 0; i < groupCount; ++i) {
+		// marker indices: [0, 1, 2, 3]
+		std::vector<int> indices = { 0, 1, 2, 3 };
+		std::shuffle(indices.begin(), indices.end(), gen);
+
+		for (int k = 0; k < numToReplace; ++k) {
+			int j = indices[k]; // 随机选中的marker index
+			M1_mixedMarkers[i][j] = M1_markersEst[i][j];
+		}
+	}
+
+}
+
+
+vtkSmartPointer<vtkPoints> Convert2VtkPoints(const std::vector<std::vector<double>>& tool) {
+	// 创建 vtkPoints 对象
+	vtkSmartPointer<vtkPoints> Points;
+	Points = vtkSmartPointer<vtkPoints>::New();
+
+	// 遍历 std::vector<std::vector<double>> 并插入点
+	for (const auto& point : tool) {
+		if (point.size() == 3) { // 确保每个点有3个坐标
+			Points->InsertNextPoint(point[0], point[1], point[2]);
+		}
+		else {
+			// 处理错误情况：点的维度不是3
+			std::cerr << "Point does not have 3 coordinates!" << std::endl;
+		}
+	}
+
+	return Points; // 返回 vtkSmartPointer<vtkPoints>
+}
 
 
 
+void RegisterMixedMarkersToTool(
+	const std::vector<std::vector<std::vector<double>>>& mixedMarkers,
+	const std::vector<std::vector<double>>& toolTemplate,
+	std::vector<cv::Mat>& outputTransforms)
+{
+	outputTransforms.clear(); // 清空原有数据
 
+	// 固定工具坐标系转换为 vtkPoints
+	vtkSmartPointer<vtkPoints> vtkToolPoints = Convert2VtkPoints(toolTemplate);
+
+	for (const auto& group : mixedMarkers) {
+		// 当前目标 marker 转换为 vtkPoints
+		vtkSmartPointer<vtkPoints> vtkTargetPoints = Convert2VtkPoints(group);
+
+		// 配准
+		ToolRegi tool_Regi;
+		tool_Regi.Tool = vtkToolPoints;
+		tool_Regi.Target = vtkTargetPoints;
+		tool_Regi.Register();
+
+		// 获取 vtkMatrix4x4 并转成 cv::Mat
+		vtkMatrix4x4* vtkMat = tool_Regi.GetMatrix();
+		cv::Mat cvMat(4, 4, CV_64F);
+		for (int r = 0; r < 4; ++r) {
+			for (int c = 0; c < 4; ++c) {
+				cvMat.at<double>(r, c) = vtkMat->GetElement(r, c);
+			}
+		}
+
+		outputTransforms.push_back(cvMat);
+	}
+
+}
+
+
+cv::Mat RegisterPoints(const std::vector<std::vector<double>>& source,
+	const std::vector<std::vector<double>>& target) {
+	assert(source.size() == target.size());
+	int N = source.size();
+
+	Eigen::MatrixXd src(3, N), tgt(3, N);
+	for (int i = 0; i < N; ++i) {
+		src(0, i) = source[i][0];
+		src(1, i) = source[i][1];
+		src(2, i) = source[i][2];
+		tgt(0, i) = target[i][0];
+		tgt(1, i) = target[i][1];
+		tgt(2, i) = target[i][2];
+	}
+
+	Eigen::Vector3d src_centroid = src.rowwise().mean();
+	Eigen::Vector3d tgt_centroid = tgt.rowwise().mean();
+
+	src.colwise() -= src_centroid;
+	tgt.colwise() -= tgt_centroid;
+
+	Eigen::Matrix3d H = src * tgt.transpose();
+
+	Eigen::JacobiSVD<Eigen::Matrix3d> svd(H, Eigen::ComputeFullU | Eigen::ComputeFullV);
+	Eigen::Matrix3d R = svd.matrixV() * svd.matrixU().transpose();
+
+	if (R.determinant() < 0) {
+		Eigen::Matrix3d V = svd.matrixV();
+		V.col(2) *= -1;
+		R = V * svd.matrixU().transpose();
+	}
+
+	Eigen::Vector3d t = tgt_centroid - R * src_centroid;
+
+	// 转换为 cv::Mat
+	cv::Mat T = cv::Mat::eye(4, 4, CV_64F);
+	for (int r = 0; r < 3; ++r) {
+		for (int c = 0; c < 3; ++c) {
+			T.at<double>(r, c) = R(r, c);
+		}
+		T.at<double>(r, 3) = t(r);
+	}
+
+	return T;
+}
+
+int main() {
+	OMCalibrate OMC;
+
+	OMC.HandeyeCalibrate3();
+	std::cout << "EMsensor_2Marker1" << OMC.EMsensor_2Marker1 << std::endl;
+	std::cout << std::endl;
+	std::cout << "EM_2Marker2" << OMC.EM_2Marker2 << std::endl;
+	std::cout << std::endl;
 }
 
 
 
 
-//int main()
-//{
-//	OMCalibrate OMC;
-//	//std::string filename = "D:/Optomagnetic-tracking/CombinedAPIsample_v2/Vega_Collected_data.csv";
-//	//OMC.ReadtRecordData(filename,12,9);
-//	//OMC.PrintTrackedData();
-//	
-//	
-//
-//	OMC.HandeyeCalibrate3();
-//	std::cout << "Aurora2Vega" << OMC.Aurora2Vega << std::endl;
-//	std::cout << std::endl;
-//	std::cout << "EMsensor_2Marker1" << OMC.EMsensor_2Marker1 << std::endl;
-//	std::cout << std::endl;
-//	std::cout << "EM_2Marker2" << OMC.EM_2Marker2 << std::endl;
-//	std::cout << std::endl;
-//
-//
-//	//Aurora_Collected_data_Staticabc.csv和Vega_Collected_data_Staticabc.csv标定结果
-//	//使用算法：cv::CALIB_ROBOT_WORLD_HAND_EYE_SHAH
-//	/*cv::Mat RecordEMsensor_2Marker1 = (cv::Mat_<double>(4, 4) <<
-//		0.9688130440658627, -0.2125049752086569, 0.1274477193181763, -14.10909762500515,
-//	-0.1141237264900248, 0.07388013079954617, 0.9907156510952434, 1.402743103227017,
-//	-0.2199478590481539, -0.9743630544025209, 0.04732417474741032, 40.39570284928978,
-//	0, 0, 0,1);
-//	cv::Mat RecordEM_2Marker2 = (cv::Mat_<double>(4, 4) <<
-//		0.7068566913459077, 0.03909418580624402, -0.7062756278788491, 61.42075358060455,
-//	-0.7063178856807577, -0.01508595729632206, -0.707734030734652, -8.047828626211167,
-//	-0.03832312966055588, 0.9991216435092377, 0.01694931280081335, -124.1516367177233,
-//	0, 0, 0, 1);*/
-//
-//	//Aurora_Collected_data_Staticabc.csv和Vega_Collected_data_Staticabc.csv标定结果
-//	//使用算法：cv::CALIB_ROBOT_WORLD_HAND_EYE_LI
-//	/*cv::Mat RecordEMsensor_2Marker1 = (cv::Mat_<double>(4, 4) <<
-//		0.9693259355208593, -0.2084142597946028, 0.130271743063791, -15.28693847924255,
-//	-0.1193484177093449, 0.06421024858526503, 0.9907739394871538, 2.128075882125435,
-//	-0.2148561982277594, -0.9759306021899744, 0.03736674714538873, 40.29436060036536,
-//	0, 0, 0, 1);
-//	cv::Mat RecordEM_2Marker2 = (cv::Mat_<double>(4, 4) <<
-//		0.702498990237248, 0.0430812595948305, -0.7103795983749606, 59.8414559322578,
-//	-0.7104176654528762, -0.01708677606742617, -0.7035728694997463, -8.201175174872091,
-//	-0.04244890255509942, 0.9989254462447857, 0.01860224493235183, -123.850180206467,
-//	0, 0, 0, 1);*/
-//
-//    //Aurora_Collected_data_Static_test27.csv和Vega_Collected_data_Static_test27.csv标定结果
-//	//使用算法：cv::CALIB_ROBOT_WORLD_HAND_EYE_SHAH
-//	/*cv::Mat RecordEMsensor_2Marker1 = (cv::Mat_<double>(4, 4) <<
-//		0.9671755070005249, -0.2204001372249867, 0.1264725984926568, -17.03223534906297,
-//	-0.1072818234213993, 0.09701563854092207, 0.9894839949397247, 1.45658943773898,
-//	-0.2303522281673381, -0.9705728954538678, 0.07018622078897263, 42.13842688132948,
-//	0, 0, 0, 1);
-//	cv::Mat RecordEM_2Marker2 = (cv::Mat_<double>(4, 4) <<
-//		0.7201568526430151, 0.002985389602308708, -0.6938048681295261, 66.91543934916911,
-//	-0.6938105802379644, 0.001667324651977747, -0.7201556073366118, -9.023501130065338,
-//	-0.0009931471018925567, 0.9999941537216244, 0.003272030165916567, -131.3936875244864,
-//	0, 0, 0, 1);*/
-//
-//	//
-//	/*cv::Mat RecordEMsensor_2Marker1 = (cv::Mat_<double>(4, 4) <<
-//		0.9630136298295092, -0.2405277446141953, 0.1214543240621798, -19.2533983122965,
-//	-0.1070406403239078, 0.07215996346702896, 0.9916326139208433, -0.4800268993572878,
-//	-0.2472792956994989, -0.9679562716069592, 0.04374478454757944, 36.82410188973542,
-//	0, 0, 0, 1);
-//	cv::Mat RecordEM_2Marker2 = (cv::Mat_<double>(4, 4) <<
-//		0.6990778776881925, 0.02703853315331224, -0.7145341409980979, 62.40616427236554,
-//	-0.7146560362853871, -0.006558305832288336, -0.69944530767278, -2.278167750799835,
-//	-0.02359810856471617, 0.999612878243136, 0.01473848440785097, -132.6401500243014,
-//	0, 0, 0, 1);*/
-//
-//	//Matlab计算结果（32数据集）
-//	/*cv::Mat RecordEMsensor_2Marker1 = (cv::Mat_<double>(4, 4) <<
-//		0.9672, - 0.1063, - 0.2308 ,  24.7655,
-//		- 0.2231,    0.0797 ,- 0.9715 ,  36.2172,
-//		0.1216,    0.9911 ,   0.0534 ,- 1.8481,
-//		0   ,      0      ,   0 ,   1.0000//		);
-//	cv::Mat RecordEM_2Marker2 = (cv::Mat_<double>(4, 4) <<
-//		0.7131 ,- 0.7004 ,- 0.0287, - 54.1880,
-//		0.0291, - 0.0114 ,   0.9995 , 125.2873,
-//		- 0.7004, - 0.7136,    0.0123 ,  40.3016,
-//		0   ,      0     ,    0  ,  1.0000//		);*/
-//
-//	//Matlab计算结果（60数据集）
-//	cv::Mat RecordEMsensor_2Marker1 = (cv::Mat_<double>(4, 4) <<
-//		0.9639, - 0.2150  ,  0.1569  ,  1.3373,
-//		- 0.1464   , 0.0639 ,   0.9872 ,- 0.9964,
-//		- 0.2222, - 0.9745 ,   0.0301,   43.6812,
-//		0    ,     0      ,   0  ,  1.0000////		);
-//	cv::Mat RecordEM_2Marker2 = (cv::Mat_<double>(4, 4) <<
-//		0.6912  ,  0.0266, - 0.7222  , 58.3635,
-//		- 0.7214, - 0.0347, - 0.6917, - 8.8387,
-//		- 0.0435 ,   0.9990 ,- 0.0048 ,- 118.5730,
-//		0     ,    0    ,     0   , 1.0000//		);
-//	
-//
-//	ErrorMetric1(OMC, RecordEMsensor_2Marker1, RecordEM_2Marker2);
-//
-//
-//
-//	
-//
-//
-//
-//	//for (int i = 0; i < OMC.Marker1_2Vega.size(); i++) {
-//	//	//test_Marker2_2Vega = OMC.createTransformationMatrix(OMC.R_Marker2_2Vega[i], OMC.t_Marker2_2Vega[i]);
-//	//	//test_EMsensor_2Aurora = OMC.createTransformationMatrix(OMC.R_EMsensor_2Aurora[i], OMC.t_EMsensor_2Aurora[i]);
-//
-//	//	//output_Marker1_2Vega = test_Marker2_2Vega * OMC.EM_2Marker2*test_EMsensor_2Aurora*Marker1_2EMsensor;
-//
-//	//	//output_Marker1_2Vega2 =  OMC.Aurora2Vega*test_EMsensor_2Aurora*Marker1_2EMsensor;
-//
-//	//	//验证在标定数据集的误差
-//	//	//output_Marker1_2Vega = OMC.Aurora2Vega * OMC.EMsensor_2Aurora[i] * Marker1_2EMsensor;
-//	//	//output_Marker1_2Vega = OMC.Marker2_2Vega[i]*OMC.EM_2Marker2 * OMC.EMsensor_2Aurora[i] * Marker1_2EMsensor;
-//
-//
-//	//	//验证标定的固定变换矩阵在其他数据集可用
-//	//	Marker1_2Aurora_Path1 = OMC.EMsensor_2Aurora[i] * RecordMarker1_2EMsensor;
-//	//	Marker1_2Aurora_Path2 = RecordMarker2_2EM *OMC.Vega_2Marker2[i]*OMC.Marker1_2Vega[i];
-//
-//
-//	//	//Marker1_2Aurora_Path1位姿
-//	//	std::cout << "Group" << i + 1 << std::endl;
-//	//	std::cout << std::endl;
-//	//	std::cout << "Marker1_2Aurora_Path1" << Marker1_2Aurora_Path1 << std::endl;
-//	//	std::cout << std::endl;
-//	//	Vector3d translationOutput1;
-//	//	translationOutput1 << Marker1_2Aurora_Path1.at<double>(0, 3), Marker1_2Aurora_Path1.at<double>(1, 3), Marker1_2Aurora_Path1.at<double>(2, 3);
-//	//	T1.push_back(translationOutput1);
-//	//	std::cout << "Translation Vector: " << translationOutput1.transpose() << std::endl;
-//	//	std::cout << std::endl;
-//	//	cv::Mat rotationMatrix1 = Marker1_2Aurora_Path1(cv::Rect(0, 0, 3, 3));
-//	//	Vector3d eulerAnglesOutput1 = rotationMatrixToEulerAngles(rotationMatrix1);
-//	//	std::cout << "Euler Angles (degrees): " << eulerAnglesOutput1.transpose() << std::endl;
-//	//	std::cout << std::endl;
-//
-//	//	//Marker1_2Aurora_Path2位姿
-//	//	std::cout << "Group" << i + 1 << std::endl;
-//	//	std::cout << std::endl;
-//	//	std::cout << "Marker1_2Aurora_Path2" << Marker1_2Aurora_Path2 << std::endl;
-//	//	std::cout << std::endl;
-//	//	Vector3d translationOutput2;
-//	//	translationOutput2 << Marker1_2Aurora_Path2.at<double>(0, 3), Marker1_2Aurora_Path2.at<double>(1, 3), Marker1_2Aurora_Path2.at<double>(2, 3);
-//	//	T2.push_back(translationOutput2);
-//	//	std::cout << "Translation Vector: " << translationOutput2.transpose() << std::endl;
-//	//	std::cout << std::endl;
-//	//	cv::Mat rotationMatrix2 = Marker1_2Aurora_Path2(cv::Rect(0, 0, 3, 3));
-//	//	Vector3d eulerAnglesOutput2 = rotationMatrixToEulerAngles(rotationMatrix2);
-//	//	std::cout << "Euler Angles (degrees): " << eulerAnglesOutput2.transpose() << std::endl;
-//
-//	//	//计算平移误差和旋转误差
-//	//	double DistanceError = (translationOutput1 - translationOutput2).norm();
-//	//	std::cout << "DistanceError " << DistanceError << std::endl;
-//	//	TranslationError.push_back(DistanceError);
-//	//	double AngleError = (eulerAnglesOutput1 - eulerAnglesOutput2).norm();
-//	//	RotationError.push_back(AngleError);
-//	//	std::cout << "AngleError " << AngleError << std::endl;
-//
-//	//}
-//	//
-//
-// //   std::cout << std::endl;
-//
-//	//// 计算 TranslationError 的Mean/Min/Max
-//	//double translationErrorMean = std::accumulate(TranslationError.begin(), TranslationError.end(), 0.0) / TranslationError.size();
-//	//std::cout << "Average Translation Error: " << translationErrorMean << std::endl;
-//	//double maxTranslationError = *std::max_element(TranslationError.begin(), TranslationError.end());
-//	//double minTranslationError = *std::min_element(TranslationError.begin(), TranslationError.end());
-//	//std::cout << "Max Translation Error: " << maxTranslationError << std::endl;
-//	//std::cout << "Min Translation Error: " << minTranslationError << std::endl;
-//
-//	//// 计算 RotationError 的Mean/Min/Max
-//	//double rotationErrorMean = std::accumulate(RotationError.begin(), RotationError.end(), 0.0) / RotationError.size();
-//	//std::cout << "Average Rotation Error: " << rotationErrorMean << std::endl;
-//	//double maxRotationError = *std::max_element(RotationError.begin(), RotationError.end());
-//	//double minRotationError = *std::min_element(RotationError.begin(), RotationError.end());
-//	//std::cout << "Max Rotation Error: " << maxRotationError << std::endl;
-//	//std::cout << "Min Rotation Error: " << minRotationError << std::endl;
-//
-//
-//	//std::cout << std::endl;
-//	//std::cout << "T1 size"<<T1.size()<<std::endl;
-//
-//
-//	////visualizePointSets(T1, T2);
-//	//
-//
-//	//// 配准结果
-//	//Matrix3d R;
-//	//Vector3d t;
-//
-//	//// 执行配准
-//	//pointSetRegistration(T1, T2, R, t);
-//
-//	//// 输出结果
-//	//std::cout << "Rotation Matrix R:\n" << R << "\n";
-//	//std::cout << "Translation Vector t:\n" << t.transpose() << "\n";
-//
-//	//// 计算误差
-//	//calculateRegistrationError(T1, T2, R, t);
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//	//std::vector<cv::Mat> t_Vega_2Marker1;
-//	//std::vector<cv::Mat> t_Marker1_2Vega;
-//	//std::vector<cv::Mat> t_Aurora_2EMSensor;
-//	//std::vector<cv::Mat> t_EMsensor_2Aurora;
-//	//// 调用函数提取平移向量并存储到 t_Marker1_2Vega
-//	//extractTranslationVectorsToMat(OMC.Vega_2Marker1, t_Vega_2Marker1);
-//	//extractTranslationVectorsToMat(OMC.Marker1_2Vega, t_Marker1_2Vega);
-//	//extractTranslationVectorsToMat(OMC.Aurora_2EMsensor, t_Aurora_2EMSensor);
-//	//extractTranslationVectorsToMat(OMC.EMsensor_2Aurora, t_EMsensor_2Aurora);
-//
-//	//// 打印提取的平移向量
-//	//for (size_t i = 0; i < t_Vega_2Marker1.size(); ++i) {
-//	//	std::cout << "t_Vega_2Marker1 " << i << " : \n" << t_Vega_2Marker1[i] << std::endl;
-//	//}
-//
-//	////// 旋转矩阵和平移向量
-//	////cv::Mat rotationMatrix, translationVector;
-//
-//	////// 计算刚性变换
-//	////if (computeRigidTransform(t_Vega_2Marker1, t_Aurora_2EMSensor, rotationMatrix, translationVector)) {
-//	////	std::cout << "Rotation Matrix: \n" << rotationMatrix << std::endl;
-//	////	std::cout << "Translation Vector: \n" << translationVector << std::endl;
-//	////}
-//	////else {
-//	////	std::cerr << "Failed to compute the rigid transform." << std::endl;
-//	////}
-//
-//	// // 应用变换
-//	//std::vector<cv::Mat> transformedPoints = applyTransformToVectors(t_Aurora_2EMSensor, RecordEMsensor_2Marker1);
-//	//// 打印提取的平移向量
-//	//for (size_t i = 0; i < transformedPoints.size(); ++i) {
-//	//	std::cout << "t_Aurora_2EMSensor_convert " << i << " : \n" << transformedPoints[i] << std::endl;
-//	//}
-//
-//	std::cin.get();
-//	
-//}
+int main33()
+{
+	OMCalibrate OMC;
+	//std::string filename = "D:/Optomagnetic-tracking/CombinedAPIsample_v2/Vega_Collected_data.csv";
+	//OMC.ReadtRecordData(filename,12,9);
+	//OMC.PrintTrackedData();
+	
+	//测试读取csv的markers坐标
+	//for (size_t i = 0; i < OMC.M1_markers.size(); ++i) {
+	//	std::cout << "Group " << i << ":\n";
+	//	for (size_t j = 0; j < OMC.M1_markers[i].size(); ++j) {
+	//		std::cout << "Marker " << j << ": ";
+	//		for (double val : OMC.M1_markers[i][j]) {
+	//			std::cout << val << " ";
+	//		}
+	//		std::cout << std::endl;
+	//	}
+	//}
+
+	OMC.HandeyeCalibrate3();
+	std::cout << "Aurora2Vega" << OMC.Aurora2Vega << std::endl;
+	std::cout << std::endl;
+	std::cout << "EMsensor_2Marker1" << OMC.EMsensor_2Marker1 << std::endl;
+	std::cout << std::endl;
+	std::cout << "EM_2Marker2" << OMC.EM_2Marker2 << std::endl;
+	std::cout << std::endl;
+
+
+	cv::Mat RecordEMsensor_2Marker1 = (cv::Mat_<double>(4, 4) <<
+		0.9717 ,- 0.1995   , 0.1266 ,- 19.7548,
+		- 0.1093  ,  0.0952  ,  0.9894  ,  2.9128,
+		- 0.2094, - 0.9753 ,   0.0707   ,38.9164,
+		0     ,    0   ,      0   , 1.0000
+		);
+	cv::Mat RecordEM_2Marker2 = (cv::Mat_<double>(4, 4) <<
+		0.7185 , - 0.0045 ,- 0.6953 ,  67.8992,
+		- 0.6953, - 0.0213, - 0.7182, - 3.8716,
+		- 0.0117  ,  0.9996 ,- 0.0184 ,- 137.7597,
+		0.0000 , 0.0000 , 0.0000  ,  1.0000
+		);
+
+
+	std::vector<std::vector<double>> tool = {
+	{0.0, 0.0, 0.0},
+	{0.0, 28.59, 41.02},
+	{0.0, 0.0, 88.00},
+	{0.0, -44.32, 40.45}
+	};
+
+	
+
+	ErrorMetric2(OMC, RecordEMsensor_2Marker1, RecordEM_2Marker2);
+
+	std::vector<std::vector<std::vector<double>>> M1_markersEst;
+	CompleteEstimate(OMC, RecordEMsensor_2Marker1, RecordEM_2Marker2, M1_markersEst);
+
+	std::vector<std::vector<std::vector<double>>> M1_mixedMarkers_1; // 每组替换1个
+	std::vector<std::vector<std::vector<double>>> M1_mixedMarkers_2; // 每组替换2个
+	std::vector<std::vector<std::vector<double>>> M1_mixedMarkers_3; // 每组替换3个
+
+	CreateMixedMarkersN(OMC, M1_markersEst, M1_mixedMarkers_1, 1);
+	CreateMixedMarkersN(OMC, M1_markersEst, M1_mixedMarkers_2, 2);
+	CreateMixedMarkersN(OMC, M1_markersEst, M1_mixedMarkers_3, 3);
+
+
+	//检查生成遮挡是否正确
+	for (int i = 0; i < 5 && i < OMC.M1_markers.size() && i < M1_markersEst.size(); ++i) {
+		std::cout << "==== Group " << i << " ====\n";
+
+		for (int j = 0; j < 4; ++j) {
+			const auto& original = OMC.M1_markers[i][j];
+			const auto& estimated = M1_markersEst[i][j];
+			const auto& mixed1 = M1_mixedMarkers_1[i][j];
+			const auto& mixed2 = M1_mixedMarkers_2[i][j];
+			const auto& mixed3 = M1_mixedMarkers_3[i][j];
+
+			std::cout << "Marker " << j << ":\n";
+			std::cout << "  Original : (" << original[0] << ", " << original[1] << ", " << original[2] << ")\n";
+			std::cout << "  Estimated: (" << estimated[0] << ", " << estimated[1] << ", " << estimated[2] << ")\n";
+			std::cout << "  Mixed-1  : (" << mixed1[0] << ", " << mixed1[1] << ", " << mixed1[2] << ")\n";
+			std::cout << "  Mixed-2  : (" << mixed2[0] << ", " << mixed2[1] << ", " << mixed2[2] << ")\n";
+			std::cout << "  Mixed-3  : (" << mixed3[0] << ", " << mixed3[1] << ", " << mixed3[2] << ")\n";
+		}
+
+		std::cout << std::endl;
+	}
+
+	std::vector<cv::Mat> M1_mixedMarkers_1_Transforms;
+	//RegisterMixedMarkersToTool(M1_mixedMarkers_1, tool, M1_mixedMarkers_1_Transforms);
+
+	std::cout << " 1个Marker遮挡" << endl;
+	for (const auto& markerSet : M1_mixedMarkers_1) {
+		cv::Mat T = RegisterPoints(tool, markerSet);
+		M1_mixedMarkers_1_Transforms.push_back(T);
+	}
+
+	//for (size_t i = 0; i < std::min(OMC.Marker1_2Vega.size(), M1_mixedMarkers_1_Transforms.size()); ++i) {
+	//	std::cout << "===== Group " << i << " =====" << std::endl;
+
+	//	std::cout << "Original (OMC.Marker1_2Vega):" << std::endl;
+	//	for (int r = 0; r < 4; ++r) {
+	//		for (int c = 0; c < 4; ++c) {
+	//			std::cout << std::fixed << std::setprecision(4)
+	//				<< OMC.Marker1_2Vega[i].at<double>(r, c) << " ";
+	//		}
+	//		std::cout << std::endl;
+	//	}
+
+	//	std::cout << "Estimated (M1_mixedMarkers_1_Transforms):" << std::endl;
+	//	for (int r = 0; r < 4; ++r) {
+	//		for (int c = 0; c < 4; ++c) {
+	//			std::cout << std::fixed << std::setprecision(4)
+	//				<< M1_mixedMarkers_1_Transforms[i].at<double>(r, c) << " ";
+	//		}
+	//		std::cout << std::endl;
+	//	}
+
+	//	std::cout << std::endl;
+	//}
+
+	ErrorCalculate(OMC, M1_mixedMarkers_1_Transforms);
+
+	std::cout << " 2个Marker遮挡" << endl;
+	std::vector<cv::Mat> M1_mixedMarkers_2_Transforms;
+	//RegisterMixedMarkersToTool(M1_mixedMarkers_1, tool, M1_mixedMarkers_1_Transforms);
+
+	for (const auto& markerSet : M1_mixedMarkers_2) {
+		cv::Mat T = RegisterPoints(tool, markerSet);
+		M1_mixedMarkers_2_Transforms.push_back(T);
+	}
+	ErrorCalculate(OMC, M1_mixedMarkers_2_Transforms);
+
+	std::cout << " 3个Marker遮挡" << endl;
+	std::vector<cv::Mat> M1_mixedMarkers_3_Transforms;
+	//RegisterMixedMarkersToTool(M1_mixedMarkers_1, tool, M1_mixedMarkers_1_Transforms);
+
+	for (const auto& markerSet : M1_mixedMarkers_3) {
+		cv::Mat T = RegisterPoints(tool, markerSet);
+		M1_mixedMarkers_3_Transforms.push_back(T);
+	}
+	ErrorCalculate(OMC, M1_mixedMarkers_3_Transforms);
+
+	
+
+
+
+	//for (int i = 0; i < OMC.Marker1_2Vega.size(); i++) {
+	//	//test_Marker2_2Vega = OMC.createTransformationMatrix(OMC.R_Marker2_2Vega[i], OMC.t_Marker2_2Vega[i]);
+	//	//test_EMsensor_2Aurora = OMC.createTransformationMatrix(OMC.R_EMsensor_2Aurora[i], OMC.t_EMsensor_2Aurora[i]);
+
+	//	//output_Marker1_2Vega = test_Marker2_2Vega * OMC.EM_2Marker2*test_EMsensor_2Aurora*Marker1_2EMsensor;
+
+	//	//output_Marker1_2Vega2 =  OMC.Aurora2Vega*test_EMsensor_2Aurora*Marker1_2EMsensor;
+
+	//	//验证在标定数据集的误差
+	//	//output_Marker1_2Vega = OMC.Aurora2Vega * OMC.EMsensor_2Aurora[i] * Marker1_2EMsensor;
+	//	//output_Marker1_2Vega = OMC.Marker2_2Vega[i]*OMC.EM_2Marker2 * OMC.EMsensor_2Aurora[i] * Marker1_2EMsensor;
+
+
+	//	//验证标定的固定变换矩阵在其他数据集可用
+	//	Marker1_2Aurora_Path1 = OMC.EMsensor_2Aurora[i] * RecordMarker1_2EMsensor;
+	//	Marker1_2Aurora_Path2 = RecordMarker2_2EM *OMC.Vega_2Marker2[i]*OMC.Marker1_2Vega[i];
+
+
+	//	//Marker1_2Aurora_Path1位姿
+	//	std::cout << "Group" << i + 1 << std::endl;
+	//	std::cout << std::endl;
+	//	std::cout << "Marker1_2Aurora_Path1" << Marker1_2Aurora_Path1 << std::endl;
+	//	std::cout << std::endl;
+	//	Vector3d translationOutput1;
+	//	translationOutput1 << Marker1_2Aurora_Path1.at<double>(0, 3), Marker1_2Aurora_Path1.at<double>(1, 3), Marker1_2Aurora_Path1.at<double>(2, 3);
+	//	T1.push_back(translationOutput1);
+	//	std::cout << "Translation Vector: " << translationOutput1.transpose() << std::endl;
+	//	std::cout << std::endl;
+	//	cv::Mat rotationMatrix1 = Marker1_2Aurora_Path1(cv::Rect(0, 0, 3, 3));
+	//	Vector3d eulerAnglesOutput1 = rotationMatrixToEulerAngles(rotationMatrix1);
+	//	std::cout << "Euler Angles (degrees): " << eulerAnglesOutput1.transpose() << std::endl;
+	//	std::cout << std::endl;
+
+	//	//Marker1_2Aurora_Path2位姿
+	//	std::cout << "Group" << i + 1 << std::endl;
+	//	std::cout << std::endl;
+	//	std::cout << "Marker1_2Aurora_Path2" << Marker1_2Aurora_Path2 << std::endl;
+	//	std::cout << std::endl;
+	//	Vector3d translationOutput2;
+	//	translationOutput2 << Marker1_2Aurora_Path2.at<double>(0, 3), Marker1_2Aurora_Path2.at<double>(1, 3), Marker1_2Aurora_Path2.at<double>(2, 3);
+	//	T2.push_back(translationOutput2);
+	//	std::cout << "Translation Vector: " << translationOutput2.transpose() << std::endl;
+	//	std::cout << std::endl;
+	//	cv::Mat rotationMatrix2 = Marker1_2Aurora_Path2(cv::Rect(0, 0, 3, 3));
+	//	Vector3d eulerAnglesOutput2 = rotationMatrixToEulerAngles(rotationMatrix2);
+	//	std::cout << "Euler Angles (degrees): " << eulerAnglesOutput2.transpose() << std::endl;
+
+	//	//计算平移误差和旋转误差
+	//	double DistanceError = (translationOutput1 - translationOutput2).norm();
+	//	std::cout << "DistanceError " << DistanceError << std::endl;
+	//	TranslationError.push_back(DistanceError);
+	//	double AngleError = (eulerAnglesOutput1 - eulerAnglesOutput2).norm();
+	//	RotationError.push_back(AngleError);
+	//	std::cout << "AngleError " << AngleError << std::endl;
+
+	//}
+	//
+
+ //   std::cout << std::endl;
+
+	//// 计算 TranslationError 的Mean/Min/Max
+	//double translationErrorMean = std::accumulate(TranslationError.begin(), TranslationError.end(), 0.0) / TranslationError.size();
+	//std::cout << "Average Translation Error: " << translationErrorMean << std::endl;
+	//double maxTranslationError = *std::max_element(TranslationError.begin(), TranslationError.end());
+	//double minTranslationError = *std::min_element(TranslationError.begin(), TranslationError.end());
+	//std::cout << "Max Translation Error: " << maxTranslationError << std::endl;
+	//std::cout << "Min Translation Error: " << minTranslationError << std::endl;
+
+	//// 计算 RotationError 的Mean/Min/Max
+	//double rotationErrorMean = std::accumulate(RotationError.begin(), RotationError.end(), 0.0) / RotationError.size();
+	//std::cout << "Average Rotation Error: " << rotationErrorMean << std::endl;
+	//double maxRotationError = *std::max_element(RotationError.begin(), RotationError.end());
+	//double minRotationError = *std::min_element(RotationError.begin(), RotationError.end());
+	//std::cout << "Max Rotation Error: " << maxRotationError << std::endl;
+	//std::cout << "Min Rotation Error: " << minRotationError << std::endl;
+
+
+	//std::cout << std::endl;
+	//std::cout << "T1 size"<<T1.size()<<std::endl;
+
+
+	////visualizePointSets(T1, T2);
+	//
+
+	//// 配准结果
+	//Matrix3d R;
+	//Vector3d t;
+
+	//// 执行配准
+	//pointSetRegistration(T1, T2, R, t);
+
+	//// 输出结果
+	//std::cout << "Rotation Matrix R:\n" << R << "\n";
+	//std::cout << "Translation Vector t:\n" << t.transpose() << "\n";
+
+	//// 计算误差
+	//calculateRegistrationError(T1, T2, R, t);
+
+
+	//std::vector<cv::Mat> t_Vega_2Marker1;
+	//std::vector<cv::Mat> t_Marker1_2Vega;
+	//std::vector<cv::Mat> t_Aurora_2EMSensor;
+	//std::vector<cv::Mat> t_EMsensor_2Aurora;
+	//// 调用函数提取平移向量并存储到 t_Marker1_2Vega
+	//extractTranslationVectorsToMat(OMC.Vega_2Marker1, t_Vega_2Marker1);
+	//extractTranslationVectorsToMat(OMC.Marker1_2Vega, t_Marker1_2Vega);
+	//extractTranslationVectorsToMat(OMC.Aurora_2EMsensor, t_Aurora_2EMSensor);
+	//extractTranslationVectorsToMat(OMC.EMsensor_2Aurora, t_EMsensor_2Aurora);
+
+	//// 打印提取的平移向量
+	//for (size_t i = 0; i < t_Vega_2Marker1.size(); ++i) {
+	//	std::cout << "t_Vega_2Marker1 " << i << " : \n" << t_Vega_2Marker1[i] << std::endl;
+	//}
+
+	////// 旋转矩阵和平移向量
+	////cv::Mat rotationMatrix, translationVector;
+
+	////// 计算刚性变换
+	////if (computeRigidTransform(t_Vega_2Marker1, t_Aurora_2EMSensor, rotationMatrix, translationVector)) {
+	////	std::cout << "Rotation Matrix: \n" << rotationMatrix << std::endl;
+	////	std::cout << "Translation Vector: \n" << translationVector << std::endl;
+	////}
+	////else {
+	////	std::cerr << "Failed to compute the rigid transform." << std::endl;
+	////}
+
+	// // 应用变换
+	//std::vector<cv::Mat> transformedPoints = applyTransformToVectors(t_Aurora_2EMSensor, RecordEMsensor_2Marker1);
+	//// 打印提取的平移向量
+	//for (size_t i = 0; i < transformedPoints.size(); ++i) {
+	//	std::cout << "t_Aurora_2EMSensor_convert " << i << " : \n" << transformedPoints[i] << std::endl;
+	//}
+
+	std::cin.get();
+	return 0;
+}
+
+

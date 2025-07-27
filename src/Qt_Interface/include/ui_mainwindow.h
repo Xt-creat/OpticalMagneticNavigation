@@ -1,7 +1,7 @@
 /********************************************************************************
 ** Form generated from reading UI file 'mainwindow.ui'
 **
-** Created by: Qt User Interface Compiler version 5.11.1
+** Created by: Qt User Interface Compiler version 5.12.12
 **
 ** WARNING! All changes made in this file will be lost when recompiling UI file!
 ********************************************************************************/
@@ -35,104 +35,121 @@ public:
     QComboBox *m_DisplayModeComboBox;
     QComboBox *m_SizeComboBox;
     QSpinBox *m_SleepSpinBox;
-    QLabel *m_DisplayCaptureLabel;
     QVBoxLayout *verticalLayout_2;
-    QLabel *m_DisplayCaptureFramesLabel;
-    QLabel *m_DisplayCaptureTimeLabel;
+    QVBoxLayout *verticalLayout_3;
+    QLabel *m_systemstatus;
+    QLabel *m_OdataLabel;
+    QLabel *m_MdataLabel;
+    QLabel *m_FusionLabel;
     QHBoxLayout *horizontalLayout_2;
     QSpacerItem *horizontalSpacer;
     QPushButton *m_LinkBtn;
     QSpacerItem *horizontalSpacer_2;
-    QPushButton *m_StartBtn;
-    QSpacerItem *horizontalSpacer_3;
-    QPushButton *m_StopBtn;
+    QPushButton *m_CalibrateBtn;
+    QSpacerItem *horizontalSpacer_6;
+    QPushButton *m_TrackingBtn;
     QSpacerItem *horizontalSpacer_4;
+    QPushButton *m_StopBtn;
+    QSpacerItem *horizontalSpacer_5;
+    QPushButton *m_DisplayBtn;
+    QSpacerItem *horizontalSpacer_3;
 
     void setupUi(QMainWindow *MainWindow)
     {
         if (MainWindow->objectName().isEmpty())
-            MainWindow->setObjectName(QStringLiteral("MainWindow"));
-        MainWindow->resize(800, 600);
+            MainWindow->setObjectName(QString::fromUtf8("MainWindow"));
+        MainWindow->resize(900, 600);
         QSizePolicy sizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
         sizePolicy.setHorizontalStretch(0);
         sizePolicy.setVerticalStretch(0);
         sizePolicy.setHeightForWidth(MainWindow->sizePolicy().hasHeightForWidth());
         MainWindow->setSizePolicy(sizePolicy);
         MainWindow->setMinimumSize(QSize(800, 600));
-        MainWindow->setMaximumSize(QSize(800, 600));
         centralWidget = new QWidget(MainWindow);
-        centralWidget->setObjectName(QStringLiteral("centralWidget"));
+        centralWidget->setObjectName(QString::fromUtf8("centralWidget"));
         verticalLayout = new QVBoxLayout(centralWidget);
         verticalLayout->setSpacing(6);
         verticalLayout->setContentsMargins(11, 11, 11, 11);
-        verticalLayout->setObjectName(QStringLiteral("verticalLayout"));
+        verticalLayout->setObjectName(QString::fromUtf8("verticalLayout"));
         horizontalLayout_3 = new QHBoxLayout();
         horizontalLayout_3->setSpacing(6);
-        horizontalLayout_3->setObjectName(QStringLiteral("horizontalLayout_3"));
+        horizontalLayout_3->setObjectName(QString::fromUtf8("horizontalLayout_3"));
         m_SelectSavePathBtn = new QPushButton(centralWidget);
-        m_SelectSavePathBtn->setObjectName(QStringLiteral("m_SelectSavePathBtn"));
+        m_SelectSavePathBtn->setObjectName(QString::fromUtf8("m_SelectSavePathBtn"));
 
         horizontalLayout_3->addWidget(m_SelectSavePathBtn);
 
         m_DisplaySavePathLineEdit = new QLineEdit(centralWidget);
-        m_DisplaySavePathLineEdit->setObjectName(QStringLiteral("m_DisplaySavePathLineEdit"));
+        m_DisplaySavePathLineEdit->setObjectName(QString::fromUtf8("m_DisplaySavePathLineEdit"));
 
         horizontalLayout_3->addWidget(m_DisplaySavePathLineEdit);
 
         m_DisplayModeComboBox = new QComboBox(centralWidget);
         m_DisplayModeComboBox->addItem(QString());
         m_DisplayModeComboBox->addItem(QString());
-        m_DisplayModeComboBox->setObjectName(QStringLiteral("m_DisplayModeComboBox"));
+        m_DisplayModeComboBox->setObjectName(QString::fromUtf8("m_DisplayModeComboBox"));
 
         horizontalLayout_3->addWidget(m_DisplayModeComboBox);
 
         m_SizeComboBox = new QComboBox(centralWidget);
         m_SizeComboBox->addItem(QString());
         m_SizeComboBox->addItem(QString());
-        m_SizeComboBox->setObjectName(QStringLiteral("m_SizeComboBox"));
+        m_SizeComboBox->setObjectName(QString::fromUtf8("m_SizeComboBox"));
 
         horizontalLayout_3->addWidget(m_SizeComboBox);
 
         m_SleepSpinBox = new QSpinBox(centralWidget);
-        m_SleepSpinBox->setObjectName(QStringLiteral("m_SleepSpinBox"));
+        m_SleepSpinBox->setObjectName(QString::fromUtf8("m_SleepSpinBox"));
 
         horizontalLayout_3->addWidget(m_SleepSpinBox);
 
 
         verticalLayout->addLayout(horizontalLayout_3);
 
-        m_DisplayCaptureLabel = new QLabel(centralWidget);
-        m_DisplayCaptureLabel->setObjectName(QStringLiteral("m_DisplayCaptureLabel"));
-        m_DisplayCaptureLabel->setScaledContents(true);
-
-        verticalLayout->addWidget(m_DisplayCaptureLabel);
-
         verticalLayout_2 = new QVBoxLayout();
         verticalLayout_2->setSpacing(6);
-        verticalLayout_2->setObjectName(QStringLiteral("verticalLayout_2"));
-        m_DisplayCaptureFramesLabel = new QLabel(centralWidget);
-        m_DisplayCaptureFramesLabel->setObjectName(QStringLiteral("m_DisplayCaptureFramesLabel"));
+        verticalLayout_2->setObjectName(QString::fromUtf8("verticalLayout_2"));
+        verticalLayout_3 = new QVBoxLayout();
+        verticalLayout_3->setSpacing(6);
+        verticalLayout_3->setObjectName(QString::fromUtf8("verticalLayout_3"));
+        m_systemstatus = new QLabel(centralWidget);
+        m_systemstatus->setObjectName(QString::fromUtf8("m_systemstatus"));
+        m_systemstatus->setMinimumSize(QSize(0, 0));
 
-        verticalLayout_2->addWidget(m_DisplayCaptureFramesLabel);
+        verticalLayout_3->addWidget(m_systemstatus);
 
-        m_DisplayCaptureTimeLabel = new QLabel(centralWidget);
-        m_DisplayCaptureTimeLabel->setObjectName(QStringLiteral("m_DisplayCaptureTimeLabel"));
 
-        verticalLayout_2->addWidget(m_DisplayCaptureTimeLabel);
+        verticalLayout_2->addLayout(verticalLayout_3);
+
+        m_OdataLabel = new QLabel(centralWidget);
+        m_OdataLabel->setObjectName(QString::fromUtf8("m_OdataLabel"));
+
+        verticalLayout_2->addWidget(m_OdataLabel);
+
+        m_MdataLabel = new QLabel(centralWidget);
+        m_MdataLabel->setObjectName(QString::fromUtf8("m_MdataLabel"));
+
+        verticalLayout_2->addWidget(m_MdataLabel);
+
+        m_FusionLabel = new QLabel(centralWidget);
+        m_FusionLabel->setObjectName(QString::fromUtf8("m_FusionLabel"));
+        m_FusionLabel->setMaximumSize(QSize(16777215, 16777215));
+
+        verticalLayout_2->addWidget(m_FusionLabel);
 
 
         verticalLayout->addLayout(verticalLayout_2);
 
         horizontalLayout_2 = new QHBoxLayout();
         horizontalLayout_2->setSpacing(6);
-        horizontalLayout_2->setObjectName(QStringLiteral("horizontalLayout_2"));
+        horizontalLayout_2->setObjectName(QString::fromUtf8("horizontalLayout_2"));
         horizontalLayout_2->setContentsMargins(-1, 0, -1, -1);
         horizontalSpacer = new QSpacerItem(40, 20, QSizePolicy::Expanding, QSizePolicy::Minimum);
 
         horizontalLayout_2->addItem(horizontalSpacer);
 
         m_LinkBtn = new QPushButton(centralWidget);
-        m_LinkBtn->setObjectName(QStringLiteral("m_LinkBtn"));
+        m_LinkBtn->setObjectName(QString::fromUtf8("m_LinkBtn"));
         sizePolicy.setHeightForWidth(m_LinkBtn->sizePolicy().hasHeightForWidth());
         m_LinkBtn->setSizePolicy(sizePolicy);
         m_LinkBtn->setMinimumSize(QSize(160, 40));
@@ -145,38 +162,59 @@ public:
 
         horizontalLayout_2->addItem(horizontalSpacer_2);
 
-        m_StartBtn = new QPushButton(centralWidget);
-        m_StartBtn->setObjectName(QStringLiteral("m_StartBtn"));
-        sizePolicy.setHeightForWidth(m_StartBtn->sizePolicy().hasHeightForWidth());
-        m_StartBtn->setSizePolicy(sizePolicy);
-        m_StartBtn->setMinimumSize(QSize(160, 40));
-        m_StartBtn->setMaximumSize(QSize(160, 40));
+        m_CalibrateBtn = new QPushButton(centralWidget);
+        m_CalibrateBtn->setObjectName(QString::fromUtf8("m_CalibrateBtn"));
+        sizePolicy.setHeightForWidth(m_CalibrateBtn->sizePolicy().hasHeightForWidth());
+        m_CalibrateBtn->setSizePolicy(sizePolicy);
+        m_CalibrateBtn->setMinimumSize(QSize(160, 40));
+        m_CalibrateBtn->setMaximumSize(QSize(160, 40));
 
-        horizontalLayout_2->addWidget(m_StartBtn);
+        horizontalLayout_2->addWidget(m_CalibrateBtn);
 
-        horizontalSpacer_3 = new QSpacerItem(40, 20, QSizePolicy::Expanding, QSizePolicy::Minimum);
+        horizontalSpacer_6 = new QSpacerItem(40, 20, QSizePolicy::Expanding, QSizePolicy::Minimum);
 
-        horizontalLayout_2->addItem(horizontalSpacer_3);
+        horizontalLayout_2->addItem(horizontalSpacer_6);
 
-        m_StopBtn = new QPushButton(centralWidget);
-        m_StopBtn->setObjectName(QStringLiteral("m_StopBtn"));
-        sizePolicy.setHeightForWidth(m_StopBtn->sizePolicy().hasHeightForWidth());
-        m_StopBtn->setSizePolicy(sizePolicy);
-        m_StopBtn->setMinimumSize(QSize(160, 40));
-        m_StopBtn->setMaximumSize(QSize(160, 40));
+        m_TrackingBtn = new QPushButton(centralWidget);
+        m_TrackingBtn->setObjectName(QString::fromUtf8("m_TrackingBtn"));
+        sizePolicy.setHeightForWidth(m_TrackingBtn->sizePolicy().hasHeightForWidth());
+        m_TrackingBtn->setSizePolicy(sizePolicy);
+        m_TrackingBtn->setMinimumSize(QSize(160, 40));
+        m_TrackingBtn->setMaximumSize(QSize(160, 40));
 
-        horizontalLayout_2->addWidget(m_StopBtn);
+        horizontalLayout_2->addWidget(m_TrackingBtn);
 
         horizontalSpacer_4 = new QSpacerItem(40, 20, QSizePolicy::Expanding, QSizePolicy::Minimum);
 
         horizontalLayout_2->addItem(horizontalSpacer_4);
 
+        m_StopBtn = new QPushButton(centralWidget);
+        m_StopBtn->setObjectName(QString::fromUtf8("m_StopBtn"));
+        m_StopBtn->setEnabled(true);
+        m_StopBtn->setMinimumSize(QSize(160, 40));
+        m_StopBtn->setMaximumSize(QSize(160, 40));
+
+        horizontalLayout_2->addWidget(m_StopBtn);
+
+        horizontalSpacer_5 = new QSpacerItem(40, 20, QSizePolicy::Expanding, QSizePolicy::Minimum);
+
+        horizontalLayout_2->addItem(horizontalSpacer_5);
+
+        m_DisplayBtn = new QPushButton(centralWidget);
+        m_DisplayBtn->setObjectName(QString::fromUtf8("m_DisplayBtn"));
+        m_DisplayBtn->setEnabled(true);
+        m_DisplayBtn->setMinimumSize(QSize(160, 40));
+
+        horizontalLayout_2->addWidget(m_DisplayBtn);
+
+        horizontalSpacer_3 = new QSpacerItem(40, 20, QSizePolicy::Expanding, QSizePolicy::Minimum);
+
+        horizontalLayout_2->addItem(horizontalSpacer_3);
+
 
         verticalLayout->addLayout(horizontalLayout_2);
 
-        verticalLayout->setStretch(1, 7);
-        verticalLayout->setStretch(2, 2);
-        verticalLayout->setStretch(3, 1);
+        verticalLayout->setStretch(1, 2);
         MainWindow->setCentralWidget(centralWidget);
 
         retranslateUi(MainWindow);
@@ -194,18 +232,21 @@ public:
         m_SizeComboBox->setItemText(0, QApplication::translate("MainWindow", "\346\234\200\344\275\263", nullptr));
         m_SizeComboBox->setItemText(1, QApplication::translate("MainWindow", "\345\205\250\345\261\217", nullptr));
 
-        m_DisplayCaptureLabel->setText(QString());
-        m_DisplayCaptureFramesLabel->setText(QApplication::translate("MainWindow", "\351\207\207\351\233\206xx\345\270\247", nullptr));
-        m_DisplayCaptureTimeLabel->setText(QApplication::translate("MainWindow", "\347\224\250\346\227\266xx\347\247\222", nullptr));
+        m_systemstatus->setText(QApplication::translate("MainWindow", "\347\263\273\347\273\237\347\212\266\346\200\201", nullptr));
+        m_OdataLabel->setText(QApplication::translate("MainWindow", "\345\205\211\345\255\246\346\225\260\346\215\256", nullptr));
+        m_MdataLabel->setText(QApplication::translate("MainWindow", "\347\224\265\347\243\201\346\225\260\346\215\256", nullptr));
+        m_FusionLabel->setText(QApplication::translate("MainWindow", "\350\236\215\345\220\210\346\225\260\346\215\256", nullptr));
         m_LinkBtn->setText(QApplication::translate("MainWindow", "\350\277\236\346\216\245", nullptr));
-        m_StartBtn->setText(QApplication::translate("MainWindow", "\345\274\200\345\247\213", nullptr));
+        m_CalibrateBtn->setText(QApplication::translate("MainWindow", "\346\240\207\345\256\232", nullptr));
 #ifndef QT_NO_SHORTCUT
-        m_StartBtn->setShortcut(QApplication::translate("MainWindow", "Return", nullptr));
+        m_CalibrateBtn->setShortcut(QApplication::translate("MainWindow", "Return", nullptr));
+#endif // QT_NO_SHORTCUT
+        m_TrackingBtn->setText(QApplication::translate("MainWindow", "\350\267\237\350\270\252", nullptr));
+#ifndef QT_NO_SHORTCUT
+        m_TrackingBtn->setShortcut(QApplication::translate("MainWindow", "Space", nullptr));
 #endif // QT_NO_SHORTCUT
         m_StopBtn->setText(QApplication::translate("MainWindow", "\345\201\234\346\255\242", nullptr));
-#ifndef QT_NO_SHORTCUT
-        m_StopBtn->setShortcut(QApplication::translate("MainWindow", "Space", nullptr));
-#endif // QT_NO_SHORTCUT
+        m_DisplayBtn->setText(QApplication::translate("MainWindow", "\346\230\276\347\244\272", nullptr));
     } // retranslateUi
 
 };

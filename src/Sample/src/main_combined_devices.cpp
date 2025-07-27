@@ -1499,7 +1499,7 @@ int main5(int argc, char* argv[])
 //}
 
 
-int main(int argc, char* argv[]) {
+int main222(int argc, char* argv[]) {
 	if (argc < 6) {
 		std::cerr << "Usage: sample.exe <device1> <tool1.rom> <tool3.rom> <device2> <tool2.rom>" << std::endl;
 		return -1;
@@ -1618,14 +1618,14 @@ int main(int argc, char* argv[]) {
 	//printTrackingData1();
 
 	//测试光磁设备能正常采集数据
-	//printTrackingData2();
+	printTrackingData2();
 
 	//光磁设备同步采集并记录csv
 	//writeCSV_with_free_point("Vega_with_free_point.csv", "combined_Aurora.csv",50);
 
 	//光磁标定数据的采集
 	//calibrateCollection("Vega_Collected_data_200.csv", "Aurora_Collected_data_200.csv", 20, 10);
-	StaticCalibrateCollection("Vega_60.csv", "Aurora_60.csv", 60, 10);
+	//StaticCalibrateCollection("Vega_10.csv", "Aurora_10.csv", 10, 10);
 
 	onErrorPrintDebugMessage1("capi1.stopTracking()", capi1.stopTracking());
 	onErrorPrintDebugMessage1("capi2.stopTracking()", capi2.stopTracking());

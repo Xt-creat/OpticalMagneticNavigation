@@ -77,8 +77,12 @@ public:
 	std::vector<TrackedData> M1_data;
 	std::vector<TrackedData> M2_data;
 	std::vector<TrackedData> EMSensor_data;
+	std::vector<std::vector<std::vector<double>>> M1_markers;
 
 	void ReadRecordData(std::vector<TrackedData>& m_data, const std::string& filename, int groups,int interval, int start);
+
+	void ReadMarkers(std::vector<std::vector<std::vector<double>>>& data, const std::string& filename, int groups, int interval);
+
 	void Quat2Matrices(std::vector<TrackedData>& data);
 	void GetRt();
 

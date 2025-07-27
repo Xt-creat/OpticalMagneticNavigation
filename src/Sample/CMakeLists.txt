@@ -6,6 +6,8 @@ file(GLOB HEADERS "${CMAKE_CURRENT_SOURCE_DIR}/include/*.h")
 message(STATUS "Source files: ${SOURCES}")
 message(STATUS "Header files: ${HEADERS}")
 
+set(VTK_DIR " D:/Env/VTK9.4/install/lib/cmake/vtk-9.4")
+
 # 定义可执行文件目标
 add_executable(Sample ${SOURCES} ${HEADERS})
 
@@ -21,12 +23,16 @@ target_link_libraries(Sample PUBLIC Library)
 # OpenCV 4.5到4.10版本, 仅CMake3.26以上支持按照版本区间的查找
 find_package(OpenCV 4.5...4.10 REQUIRED)
 
-# VTK 8.1到9.4版本
-find_package(VTK 8.1...9.4 REQUIRED )
+# VTK 8.1到9.5版本
+find_package(VTK 8.1...9.5 REQUIRED )
 message(STATUS "VTK Libraries: ${VTK_LIBRARIES}")
 
 # PCL 1.8到1.14版本
 find_package(PCL 1.8...1.14 REQUIRED)
+
+# 查找 Qt5 必需模块
+find_package(Qt5 COMPONENTS Widgets Core Gui REQUIRED)
+
 
 # 更为推荐的是使用target_include_directories, 这样能灵活控制哪个项目需要哪些库
 target_include_directories(Sample PUBLIC

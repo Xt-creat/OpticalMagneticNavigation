@@ -41,7 +41,7 @@ void printTrackingData(const TrackingData& data) {
 		<< data.tooltip[2] << "]" << std::endl;
 
 	std::cout << "Number of Points in spCord: " << data.spCord->GetNumberOfPoints() << std::endl;
-	std::cin.get();
+	return;
 }
 
 //example1  --tool  8700339.rom:
@@ -58,10 +58,12 @@ void printTrackingData(const TrackingData& data) {
 int main4()
 {
 	std::vector<std::vector<double>> tool;
-	tool = { {0.0,0.0,0.0 },{-50.72,6.29,0},{0.0,63.21,0} };
+	tool = { {0.0,0.0,0.0 },{0.0,28.59,41.02},{0.0,0.0,88.00},{0.0,-44.32,40.45} };
 	std::vector<std::vector<double>> target;
-	target = { {10.6416,-143.197,-1146.8 },{-31.5639,-170.643,-1155.67},{-30.5452,-95.4675,-1143.57} };
-	
+	//target = { {-157.679,-176.634,-1292.75 },{-187.989,-213.682,-1277.59},{-161.993,-253.648,-1250.46},{-116.234,-210.168,-1264.92} };
+	target = { {-157.679,-176.634,-1288.75 },{-187.989,-213.682,-1277.59},{-161.993,-253.648,-1250.46},{-116.234,-210.168,-1264.92} };
+
+	//target = { {-90.4536, 89.3226, -1272.74},{-112.24, 46.254, -1279.93},{-80.9604, 4.14194, -1292.11},{-42.7477, 55.8719, -1286.55} };
 
 
 	ToolRegi tool_Regi;
@@ -71,11 +73,28 @@ int main4()
 	
 	vtkMatrix4x4 *reg_Matrix;
 	reg_Matrix = tool_Regi.GetMatrix();
+	reg_Matrix->Print(std::cout);
 
 	TrackingData trackingData;
 	trackingData = tool_Regi.GetTrackingData();
 	printTrackingData(trackingData);
 
+
+	for (const auto& point : tool) {
+		double input[4] = { point[0], point[1], point[2], 1.0 };
+		double output[4] = { 0 };
+
+		reg_Matrix->MultiplyPoint(input, output);
+
+		std::cout << "Transformed Point: ("
+			<< output[0] << ", "
+			<< output[1] << ", "
+			<< output[2] << ")" << std::endl;
+	}
+
+	std::cout << "---------------- "<<endl;
+
+	std::cin.get();
 	return 0;
 
 }
