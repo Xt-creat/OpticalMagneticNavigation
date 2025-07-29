@@ -1,0 +1,18 @@
+Cdata_28
+28组数据
+手持器械
+用的是8700339.rom  器械坐标系中心在一个Marker上  
+
+Calibrate1和Calibrate2
+各30组数据
+手持器械
+用的是Otool1.rom   器械坐标系校准到了针尖
+
+
+Calibrate3
+45组数据
+机械臂加持  少旋转
+用的是Otool1.rom   器械坐标系校准到了针尖
+
+Calibrate3_m
+剔除掉Calibrate3中的7组数据，剩余38组
