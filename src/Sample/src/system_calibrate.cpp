@@ -735,7 +735,7 @@ cv::Mat RegisterPoints(const std::vector<std::vector<double>>& source,
 	return T;
 }
 
-int main() {
+int main32() {
 	OMCalibrate OMC;
 
 	OMC.HandeyeCalibrate3();
@@ -743,6 +743,8 @@ int main() {
 	std::cout << std::endl;
 	std::cout << "EM_2Marker2" << OMC.EM_2Marker2 << std::endl;
 	std::cout << std::endl;
+
+	return 0;
 }
 
 
