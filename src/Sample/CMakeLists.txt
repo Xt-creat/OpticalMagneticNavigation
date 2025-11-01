@@ -1,3 +1,8 @@
+# 设置CMake策略，支持使用环境变量查找包
+if(POLICY CMP0074)
+    cmake_policy(SET CMP0074 NEW)
+endif()
+
 # 设置源文件
 file(GLOB SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp")
 file(GLOB HEADERS "${CMAKE_CURRENT_SOURCE_DIR}/include/*.h")

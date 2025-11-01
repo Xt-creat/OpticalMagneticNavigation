@@ -1,3 +1,8 @@
+# 设置CMake策略，支持使用环境变量查找包
+if(POLICY CMP0074)
+    cmake_policy(SET CMP0074 NEW)
+endif()
+
 set(CMAKE_AUTOMOC ON) # 自动生成moc_*.cpp文件, 连接Qt的信号槽函数
 set(CMAKE_AUTORCC ON) # 自动处理qrc文件, 加载图片等资源
 set(CMAKE_AUTOUIC ON) # 根据*.ui文件自动生成ui_*.h头文件
@@ -14,7 +19,7 @@ file(GLOB UI_FILES "${CMAKE_CURRENT_SOURCE_DIR}/src/*.ui")
 message(STATUS "Source files: ${SOURCES}")
 message(STATUS "Header files: ${HEADERS}")
 
-set(VTK_DIR " D:/Env/VTK9.4/install/lib/cmake/vtk-9.4")
+set(VTK_DIR "D:/Env/VTK9.4/install/lib/cmake/vtk-9.4")
 
 # 定义可执行文件目标
 add_executable(Qt_Interface ${SOURCES} ${HEADERS} ${UI_FILES})
@@ -55,7 +60,7 @@ find_package(VTK 9.4 COMPONENTS
 	FiltersGeometry
 	FiltersSources
 	FiltersGeneral
-    	FiltersModeling
+    FiltersModeling
 	FiltersCore
 	CommonExecutionModel
 	CommonDataModel

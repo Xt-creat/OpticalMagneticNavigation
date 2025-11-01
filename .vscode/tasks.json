@@ -1,0 +1,119 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "CMake Configure",
+            "type": "shell",
+            "command": "D:\\Env\\cmake-3.28.0\\bin\\cmake.exe",
+            "args": [
+                "-S", "${workspaceFolder}/src",
+                "-B", "${workspaceFolder}/build2",
+                "-G", "Visual Studio 17 2022",
+                "-A", "x64",
+                "-T", "host=x64"
+            ],
+            "group": "build",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared"
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "CMake Build",
+            "type": "shell",
+            "command": "D:\\Env\\cmake-3.28.0\\bin\\cmake.exe",
+            "args": ["--build", "${workspaceFolder}/build2", "--config", "Release"],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "dependsOn": "CMake Configure",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared"
+            },
+            "problemMatcher": "$msCompile"
+        },
+        {
+            "label": "CMake Build Release",
+            "type": "shell",
+            "command": "D:\\Env\\cmake-3.28.0\\bin\\cmake.exe",
+            "args": ["--build", "${workspaceFolder}/build2", "--config", "Release"],
+            "group": "build",
+            "dependsOn": "CMake Configure",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared"
+            },
+            "problemMatcher": "$msCompile"
+        },
+        {
+            "label": "CMake Build Debug",
+            "type": "shell",
+            "command": "D:\\Env\\cmake-3.28.0\\bin\\cmake.exe",
+            "args": ["--build", "${workspaceFolder}/build2", "--config", "Debug"],
+            "group": "build",
+            "dependsOn": "CMake Configure",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared"
+            },
+            "problemMatcher": "$msCompile"
+        },
+        {
+            "label": "List Build Output",
+            "type": "shell",
+            "command": "dir",
+            "args": ["${workspaceFolder}\\build2\\bin\\Release", "/b"],
+            "group": "build",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared"
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "Open with Qt Designer",
+            "type": "shell",
+            "command": "D:/Qt/Qt5.12.10/5.12.10/msvc2017_64/bin/designer.exe",
+            "args": ["${file}"],
+            "group": "build",
+            "presentation": {
+                "echo": false,
+                "reveal": "never",
+                "focus": false,
+                "panel": "shared"
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "Generate UI Header",
+            "type": "shell",
+            "command": "D:/Qt/Qt5.12.10/5.12.10/msvc2017_64/bin/uic.exe",
+            "args": [
+                "${file}",
+                "-o",
+                "${fileDirname}/ui_${fileBasenameNoExtension}.h"
+            ],
+            "group": "build",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared"
+            },
+            "problemMatcher": []
+        }
+    ]
+}

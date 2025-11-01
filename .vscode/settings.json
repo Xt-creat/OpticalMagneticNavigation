@@ -1,0 +1,69 @@
+{
+    "cmake.buildDirectory": "${workspaceFolder}/build2",
+    "cmake.generator": "Visual Studio 17 2022",
+    "cmake.configureArgs": [
+        "-A", "x64",
+        "-T", "host=x64"
+    ],
+    "cmake.sourceDirectory": "${workspaceFolder}/src",
+    "cmake.cmakePath": "D:\\Env\\cmake-3.28.0\\bin\\cmake.exe",
+    "cmake.buildType": "Release",
+    "cmake.configureOnEdit": false,
+    "cmake.configureOnOpen": false,
+    "cmake.preferredGenerators": [
+        "Visual Studio 17 2022",
+        "Visual Studio 16 2019", 
+        "Unix Makefiles",
+        "Ninja"
+    ],
+    "files.associations": {
+        "*.h": "cpp",
+        "*.cpp": "cpp",
+        "qmessagebox": "cpp",
+        "*.ui": "xml",
+        "qdialog": "cpp"
+    },
+    "files.encoding": "gbk",
+    "files.autoGuessEncoding": true,
+    "[cpp]": {
+        "files.encoding": "gbk"
+    },
+    "[c]": {
+        "files.encoding": "gbk"
+    },
+    "[xml]": {
+        "files.encoding": "utf8"
+    },
+    "files.exclude": {
+        "**/.git": true,
+        "**/.svn": true,
+        "**/.hg": true,
+        "**/CVS": true,
+        "**/.DS_Store": true
+    },
+    "qt.qmakePath": "D:/Qt/Qt5.12.10/5.12.10/msvc2017_64/bin/qmake.exe",
+    "qt.qtPath": "D:/Qt/Qt5.12.10/5.12.10/msvc2017_64",
+    "qt.designerPath": "D:/Qt/Qt5.12.10/5.12.10/msvc2017_64/bin/designer.exe",
+    "workbench.editorAssociations": {
+        "*.ui": "default"
+    },
+    "terminal.integrated.profiles.windows": {
+        "Qt Designer": {
+            "path": "D:/Qt/Qt5.12.10/5.12.10/msvc2017_64/bin/designer.exe"
+        }
+    },
+    // 添加快速打开Qt Designer的任务
+    "qt.tools.designer.enabled": true,
+    "qt.tools.linguist.enabled": true,
+    "cmake.environment": {
+        "PATH": "D:/Qt/Qt5.12.10/5.12.10/msvc2017_64/bin;${env:PATH}"
+    },
+    "cmake.debugConfig": {
+        "environment": [
+            {
+                "name": "PATH", 
+                "value": "D:/Qt/Qt5.12.10/5.12.10/msvc2017_64/bin;${env:PATH}"
+            }
+        ]
+    }
+}
