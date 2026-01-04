@@ -29,8 +29,8 @@ CalibrationDialog::CalibrationDialog(const QString& savePath, QWidget *parent) :
 	ui->label_2->setText("Waiting for collection to begin");
 
 	// 打开 CSV 文件（只打开一次）
-	csvFile1.open("Vega.csv", std::ios::out);
-	csvFile2.open("Aurora.csv", std::ios::out);
+	csvFile1.open((m_savePath + "/Vega.csv").toStdString(), std::ios::out);
+	csvFile2.open((m_savePath + "/Aurora.csv").toStdString(), std::ios::out);
 
 	// 写 CSV 表头
 	csvFile1 << "#Tools\n";
@@ -197,9 +197,10 @@ void CalibrationDialog::Calibrationcalculate() {
 
 void CalibrationDialog::saveMatToTxt(const cv::Mat& mat, const std::string& filename)
 {
-	std::ofstream file(filename);
+	QString fullPath = m_savePath + "/" + QString::fromStdString(filename); // 拼接完整路径
+	std::ofstream file(fullPath.toStdString()); // 使用完整路径打开文件
 	if (!file.is_open()) {
-		std::cerr << "无法打开文件: " << filename << std::endl;
+		std::cerr << "无法打开文件: " << fullPath.toStdString() << std::endl; // 打印完整路径
 		return;
 	}
 
@@ -223,7 +224,7 @@ void CalibrationDialog::saveMatToTxt(const cv::Mat& mat, const std::string& file
 	}
 
 	file.close();
-	std::cout << "矩阵已保存到: " << filename << std::endl;
+	std::cout << "矩阵已保存到: " << fullPath.toStdString() << std::endl; // 打印完整路径
 }
 
 

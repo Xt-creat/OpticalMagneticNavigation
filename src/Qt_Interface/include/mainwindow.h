@@ -8,6 +8,7 @@
 #include "NDIWorker.h"
 #include"DeviceReader.h"
 #include "DisplayWidget.h" 
+#include "TrackingRecordingDialog.h"
 #include <opencv2/opencv.hpp>
 #include <vtkSmartPointer.h>
 
@@ -73,6 +74,7 @@ private:
 	qint64 m_StartTimePoint;
 
 	DisplayWidget* displayWidget = nullptr;  // 保存显示窗口指针
+	TrackingRecordingDialog* m_recordingDialog = nullptr;
 };
 
 #endif // MAINWINDOW_H

@@ -2,7 +2,7 @@
 
 
 
-build2:
+build:
 
 搭建环境：
 

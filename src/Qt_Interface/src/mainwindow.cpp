@@ -137,6 +137,17 @@ void MainWindow::OnStartTracking()
 		ui->m_systemstatus->setText("Tracking in progress");
 		ui->m_systemstatus->setStyleSheet("color: green;");
 
+		// 显示记录对话框
+		if (!m_recordingDialog) {
+			m_recordingDialog = new TrackingRecordingDialog(m_savePath, this);
+			m_recordingDialog->setAttribute(Qt::WA_DeleteOnClose);
+			connect(m_recordingDialog, &QObject::destroyed, [this]() {
+				m_recordingDialog = nullptr;
+				});
+		}
+		m_recordingDialog->show();
+		m_recordingDialog->raise();
+
 	}
 	else {
 		ui->m_systemstatus->setText("Device not connected");
@@ -192,6 +203,10 @@ void MainWindow::OnStopTracking() {
 void MainWindow::updateODataLabel(const std::vector<ToolData>& tools)
 {
 	O_data = tools;
+
+	if (m_recordingDialog) {
+		m_recordingDialog->addOData(tools);
+	}
 
 	QString O_text;
 	QString F_text;
@@ -360,6 +375,10 @@ void MainWindow::updateMDataLabel(const std::vector<ToolData>& tools) {
 
 	M_data = tools;
 
+	if (m_recordingDialog) {
+		m_recordingDialog->addMData(tools);
+	}
+
 	QString text;
 	for (size_t i = 0; i < tools.size(); ++i) {
 		const ToolData& data = tools[i];
@@ -414,10 +433,13 @@ void MainWindow::onDisplayBtnClicked()
 
 void MainWindow::OnSelectBtnClicked()
 {
-	m_savePath = QFileDialog::getExistingDirectory(this, tr("Open Directory"),
-		"E:/",QFileDialog::ShowDirsOnly| QFileDialog::DontResolveSymlinks);
-	ui->m_DisplaySavePathLineEdit->setText(m_savePath);
-	qDebug() << "Selected Path:" << m_savePath;
+	QString selectedPath = QFileDialog::getExistingDirectory(this, tr("选择数据保存路径"),
+		"", QFileDialog::ShowDirsOnly | QFileDialog::DontResolveSymlinks);
+	if (!selectedPath.isEmpty()) {
+		m_savePath = selectedPath;
+		ui->m_DisplaySavePathLineEdit->setText(m_savePath);
+		qDebug() << "Selected Path:" << m_savePath;
+	}
 }
 
 void MainWindow::quaternionToEuler(double w, double x, double y, double z,
@@ -441,10 +463,11 @@ void MainWindow::quaternionToEuler(double w, double x, double y, double z,
 
 void MainWindow::loadMatFromTxt(const std::string &filename, cv::Mat &mat)
 {
+    QString fullPath = m_savePath + "/" + QString::fromStdString(filename); // 拼接完整路径
     // 打开文件
-    std::ifstream file(filename);
+    std::ifstream file(fullPath.toStdString()); // 使用完整路径打开文件
     if (!file.is_open()) {
-        std::cerr << "无法打开文件: " << filename << std::endl;
+        std::cerr << "无法打开文件: " << fullPath.toStdString() << std::endl; // 打印完整路径
         return;
     }
 
