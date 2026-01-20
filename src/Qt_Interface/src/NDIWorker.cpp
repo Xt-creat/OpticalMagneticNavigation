@@ -33,8 +33,8 @@ extern CombinedApi M_capi;
 
 NDIWorker::NDIWorker()
 {
-	//device1 = "P9-01077";
-	device1 = "P9-14811";
+	device1 = "P9-01077";
+	//device1 = "P9-14811";
 	//tool1 = "8700339.rom";
 	tool1 = "Otool1.rom";
 	tool2 = "20241023.rom";

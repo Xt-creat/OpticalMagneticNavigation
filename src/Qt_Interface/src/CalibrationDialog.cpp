@@ -22,22 +22,31 @@ CalibrationDialog::CalibrationDialog(const QString& savePath, QWidget *parent) :
 
 	
 	// 设置窗口标题
-	this->setWindowTitle("System calibration");
+	this->setWindowTitle(QString::fromLocal8Bit("系统标定"));
 
-	// 修改标签文本
-	//ui->label->setText("Preparing to start system calibration...");
-	ui->label_2->setText("Waiting for collection to begin");
+	// 检查路径有效性
+	if (m_savePath.isEmpty()) {
+		ui->label_2->setText(QString::fromLocal8Bit("错误: 请先在主界面选择数据保存路径！"));
+		ui->recordButton->setEnabled(false);
+	}
+	else {
+		ui->label_2->setText(QString::fromLocal8Bit("等待开始采集..."));
+		
+		// 尝试打开 CSV 文件
+		csvFile1.open((m_savePath + "/Vega.csv").toStdString(), std::ios::out);
+		csvFile2.open((m_savePath + "/Aurora.csv").toStdString(), std::ios::out);
 
-	// 打开 CSV 文件（只打开一次）
-	csvFile1.open((m_savePath + "/Vega.csv").toStdString(), std::ios::out);
-	csvFile2.open((m_savePath + "/Aurora.csv").toStdString(), std::ios::out);
-
-	// 写 CSV 表头
-	csvFile1 << "#Tools\n";
-	csvFile2 << "#Tools\n";
-
+		if (!csvFile1.is_open() || !csvFile2.is_open()) {
+			ui->label_2->setText(QString::fromLocal8Bit("错误: 无法创建CSV文件，请检查路径权限"));
+			ui->recordButton->setEnabled(false);
+		}
+		else {
+			// 写 CSV 表头
+			csvFile1 << "#Tools\n";
+			csvFile2 << "#Tools\n";
+		}
+	}
 	
-	//connect(ui->startButton, &QPushButton::clicked,this, &CalibrationDialog::StaticCalibrateCollection);    //初始的采集实现
 	connect(ui->buttonBox->button(QDialogButtonBox::Cancel), &QPushButton::clicked,this, &CalibrationDialog::reject);
 
 
@@ -62,18 +71,29 @@ void CalibrationDialog::StaticCalibrateCollection()
 	const int numberOfLines = 10;  // 每组采集 10 行
 	int linesWritten = 0;
 
+	// 增加对文件状态的检查
+	if (!csvFile1.is_open() || !csvFile2.is_open()) {
+		ui->label->setText(QString::fromLocal8Bit("错误: 文件未打开"));
+		return;
+	}
+
 	while (linesWritten < numberOfLines)
 	{
 		std::vector<ToolData> enabledTools2 = M_capi.getTrackingDataBX(
 			TrackingReplyOption::TransformData | TrackingReplyOption::AllTransforms);
 		std::vector<ToolData> enabledTools1 = O_capi.getTrackingDataBX2();
 
+		// 增加对数据有效性的检查，如果任何一个设备没拿到数据，则跳过此行
+		if (enabledTools1.empty() || enabledTools2.empty()) {
+			continue; 
+		}
+
 		// 如果是第 1 行，写 CSV 表头
 		if (linesWritten == 0) {
 			for (int t = 0; t < enabledTools1.size(); t++) {
 				csvFile1 << ",ToolInfo,Frame#,PortHandle,Face#,timespec_s,timespec_ns,"
 					"TransformStatus,Q0,Qx,Qy,Qz,Tx,Ty,Tz,Error,#Markers";
-				for (int m = 0; m < enabledTools1[t].markers.size(); m++) {
+				for (int m = 0; m < (int)enabledTools1[t].markers.size(); m++) {
 					csvFile1 << ",Marker" << m << ".Status,Tx,Ty,Tz";
 				}
 			}
@@ -82,7 +102,7 @@ void CalibrationDialog::StaticCalibrateCollection()
 			for (int t = 0; t < enabledTools2.size(); t++) {
 				csvFile2 << ",ToolInfo,Frame#,PortHandle,Face#,timespec_s,timespec_ns,"
 					"TransformStatus,Q0,Qx,Qy,Qz,Tx,Ty,Tz,Error,#Markers";
-				for (int m = 0; m < enabledTools2[t].markers.size(); m++) {
+				for (int m = 0; m < (int)enabledTools2[t].markers.size(); m++) {
 					csvFile2 << ",Marker" << m << ".Status,Tx,Ty,Tz";
 				}
 			}
@@ -107,30 +127,26 @@ void CalibrationDialog::StaticCalibrateCollection()
 	}
 	csvFile1 << std::endl;
 	csvFile2 << std::endl;
+	csvFile1.flush(); // 确保写入
+	csvFile2.flush();
 
 	// 1 组采集完成 → 更新组数
 	currentGroupIndex++;
 
 	// 更新 UI 显示进度
-	ui->label_2->setText(QString("Current progress: %1 / %2 groups")
+	ui->label_2->setText(QString::fromLocal8Bit("当前进度: %1 / %2 组")
 		.arg(currentGroupIndex)
 		.arg(totalGroups));
 
 	// 如果全部完成
 	if (currentGroupIndex >= totalGroups) {
-		ui->label->setText("All data collection completed!");
+		ui->label->setText(QString::fromLocal8Bit("数据采集全部完成！"));
 		ui->recordButton->setEnabled(false);
-
-		ui->label->setText("Calculate Done !");
 	}
 	else {
-		ui->label->setText("Collecting...");
+		ui->label->setText(QString::fromLocal8Bit("正在采集..."));
 	}
-
-
 }
-
-
 
 /**
 * @brief Returns a string representation of the data in CSV format.
@@ -180,18 +196,24 @@ void CalibrationDialog::Calibrationcalculate() {
 	//调用OMCalibrate中的方法实现采集数据的处理和初步计算标定矩阵
 	OMCalibrate OMC;
 
+	ui->label->setText(QString::fromLocal8Bit("正在计算标定矩阵..."));
+	QApplication::processEvents(); // 刷新UI显示
+
 	OMC.HandeyeCalibrate3();
+	
+	// 检查标定结果是否有效（简单检查矩阵是否为空，如果OMCalibrate支持）
+	if (OMC.Marker1_2EMsensor.empty() || OMC.EM_2Marker2.empty()) {
+		ui->label->setText(QString::fromLocal8Bit("计算失败: 采集数据无效"));
+		return;
+	}
+
 	std::cout << "Marker1_2EMsensor" << OMC.Marker1_2EMsensor << std::endl;
-	std::cout << std::endl;
-	//std::cout << "EMsensor_2Marker1" << OMC.EMsensor_2Marker1 << std::endl;
-	//std::cout << std::endl;
 	std::cout << "EM_2Marker2" << OMC.EM_2Marker2 << std::endl;
-	std::cout << std::endl;
 
 	saveMatToTxt(OMC.Marker1_2EMsensor, "Marker1_2EMsensor.txt");
 	saveMatToTxt(OMC.EM_2Marker2, "EM_2Marker2.txt");
 
-	ui->label->setText("Calculate Done !");
+	ui->label->setText(QString::fromLocal8Bit("计算完成并已保存！"));
 }
 
 

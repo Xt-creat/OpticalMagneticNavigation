@@ -26,7 +26,7 @@ TrackingRecordingDialog::~TrackingRecordingDialog()
 void TrackingRecordingDialog::onStartRecording()
 {
     if (m_savePath.isEmpty()) {
-        ui->m_statusLabel->setText("错误: 未指定保存路径！");
+        ui->m_statusLabel->setText(QString::fromLocal8Bit("错误: 未指定保存路径！"));
         return;
     }
 
@@ -49,10 +49,10 @@ void TrackingRecordingDialog::onStartRecording()
         ui->m_startBtn->setEnabled(false);
         ui->m_stopBtn->setEnabled(true);
         m_timer->start(1000);
-        ui->m_statusLabel->setText(QString("状态: 正在记录 (第 %1 次)").arg(m_recordCount));
+        ui->m_statusLabel->setText(QString::fromLocal8Bit("状态: 正在记录 (第 %1 次)").arg(m_recordCount));
         ui->m_timeLabel->setText("00:00:00");
     } else {
-        ui->m_statusLabel->setText("错误: 无法创建文件！");
+        ui->m_statusLabel->setText(QString::fromLocal8Bit("错误: 无法创建文件！"));
     }
 }
 
@@ -61,12 +61,18 @@ void TrackingRecordingDialog::onStopRecording()
     if (m_isRecording) {
         m_isRecording = false;
         m_timer->stop();
-        if (m_opticalFile.is_open()) m_opticalFile.close();
-        if (m_magneticFile.is_open()) m_magneticFile.close();
+        if (m_opticalFile.is_open()) {
+            m_opticalFile.flush();
+            m_opticalFile.close();
+        }
+        if (m_magneticFile.is_open()) {
+            m_magneticFile.flush();
+            m_magneticFile.close();
+        }
         
         ui->m_startBtn->setEnabled(true);
         ui->m_stopBtn->setEnabled(false);
-        ui->m_statusLabel->setText("状态: 已停止");
+        ui->m_statusLabel->setText(QString::fromLocal8Bit("状态: 已停止，数据已保存"));
     }
 }
 

@@ -27,12 +27,15 @@ CombinedApi M_capi = CombinedApi();
 
 MainWindow::MainWindow(QWidget *parent) :
 	QMainWindow(parent),
-	ui(new Ui::MainWindow)
+	ui(new Ui::MainWindow),
+	m_NDIWorker(nullptr),
+	deviceReader1(nullptr),
+	deviceReader2(nullptr),
+	thread1(nullptr),
+	thread2(nullptr)
 {
 	ui->setupUi(this);
 
-	//ui->m_systemstatus->setMinimumHeight(150);
-	//ui->m_systemstatus->setWordWrap(true);
 	ui->m_OdataLabel->setMinimumHeight(150);
 	ui->m_OdataLabel->setWordWrap(true);
 	ui->m_MdataLabel->setMinimumHeight(150);
@@ -68,19 +71,30 @@ MainWindow::~MainWindow()
 {
     delete ui;
 
-	delete m_NDIWorker;
+	if (m_NDIWorker) delete m_NDIWorker;
 
-	thread1->quit();
-	thread1->wait();
-	delete thread1;
+	if (thread1) {
+		thread1->quit();
+		thread1->wait();
+		delete thread1;
+		thread1 = nullptr;
+	}
 
-	thread2->quit();
-	thread2->wait();
-	delete thread2;
+	if (thread2) {
+		thread2->quit();
+		thread2->wait();
+		delete thread2;
+		thread2 = nullptr;
+	}
 
-	delete deviceReader1;
-	delete deviceReader2;
-	
+	if (deviceReader1) {
+		delete deviceReader1;
+		deviceReader1 = nullptr;
+	}
+	if (deviceReader2) {
+		delete deviceReader2;
+		deviceReader2 = nullptr;
+	}
 }
 
 void MainWindow::OnStartBtnClicked()
@@ -107,15 +121,35 @@ void MainWindow::updateSystemStatus(bool isConnected) {
 
 void MainWindow::OnStartTracking()
 {
-	if (m_connected) {
-		O_capi.startTracking();
-		M_capi.startTracking();
+	if (!m_connected) {
+		ui->m_systemstatus->setText("Device not connected");
+		ui->m_systemstatus->setStyleSheet("color: red;");
+		return;
+	}
 
-		//  只有在可视化窗口存在的情况下才启动动画
-		if (displayWidget) {
-			displayWidget->startRealtimeAnimation();
-			
+	// --- 关键修复：检查是否已经在跟踪中 ---
+	// 如果线程已经存在且在运行，说明系统正在采集数据，只需处理对话框逻辑
+	if ((thread1 && thread1->isRunning()) || (thread2 && thread2->isRunning())) {
+		if (!m_recordingDialog) {
+			m_recordingDialog = new TrackingRecordingDialog(m_savePath, this);
+			m_recordingDialog->setAttribute(Qt::WA_DeleteOnClose);
+			connect(m_recordingDialog, &QObject::destroyed, [this]() {
+				m_recordingDialog = nullptr;
+				});
 		}
+		m_recordingDialog->show();
+		m_recordingDialog->raise();
+		return;
+	}
+
+	// 只有在没启动时才执行启动流程，不再盲目调用 OnStopTracking()
+	O_capi.startTracking();
+	M_capi.startTracking();
+
+	//  只有在可视化窗口存在的情况下才启动动画
+	if (displayWidget) {
+		displayWidget->startRealtimeAnimation();
+	}
 
 		deviceReader1 = new DeviceReader(1, 100); // 每100ms读取一次
 		deviceReader2 = new DeviceReader(2, 50); // 每50ms读取一次,电磁位姿更新更快，读取频率也设的更高
@@ -147,52 +181,49 @@ void MainWindow::OnStartTracking()
 		}
 		m_recordingDialog->show();
 		m_recordingDialog->raise();
-
-	}
-	else {
-		ui->m_systemstatus->setText("Device not connected");
-		ui->m_systemstatus->setStyleSheet("color: red;");
-	}
 }
 
 void MainWindow::OnStopTracking() {
-	// 停止设备跟踪
-	O_capi.stopTracking();
-	M_capi.stopTracking();
-
-
+	
+	// 1. --- 关键修复：必须先停止后台线程，再停止硬件 ---
 	// 停止线程1
-	if (thread1 && thread1->isRunning()) {
-
+	if (thread1) {
 		disconnect(deviceReader1, &DeviceReader::newODataAvailable, this, &MainWindow::updateODataLabel);
-		// 在设备线程中调用 stop()，让其自己停掉 timer
 		QMetaObject::invokeMethod(deviceReader1, "stop", Qt::QueuedConnection);
-
 		thread1->quit();
-		thread1->wait();
-
+		if (!thread1->wait(1000)) { // 给线程 1 秒时间退出
+			thread1->terminate();
+			thread1->wait();
+		}
 		deviceReader1->deleteLater();
 		deviceReader1 = nullptr;
-
 		thread1->deleteLater();
 		thread1 = nullptr;
 	}
 
 	// 停止线程2
-	if (thread2 && thread2->isRunning()) {
-		
+	if (thread2) {
 		disconnect(deviceReader2, &DeviceReader::newMDataAvailable, this, &MainWindow::updateMDataLabel);
-
 		QMetaObject::invokeMethod(deviceReader2, "stop", Qt::QueuedConnection);
-
 		thread2->quit();
-		thread2->wait();
-
+		if (!thread2->wait(1000)) {
+			thread2->terminate();
+			thread2->wait();
+		}
 		deviceReader2->deleteLater();
 		deviceReader2 = nullptr;
-
 		thread2->deleteLater();
 		thread2 = nullptr;
+	}
+
+	// 2. 线程完全退出后，再停止设备硬件跟踪
+	O_capi.stopTracking();
+	M_capi.stopTracking();
+
+	// 确保录制对话框也被清理
+	if (m_recordingDialog) {
+		m_recordingDialog->close();
+		m_recordingDialog = nullptr;
 	}
 
 	// UI 状态恢复
@@ -208,13 +239,14 @@ void MainWindow::updateODataLabel(const std::vector<ToolData>& tools)
 		m_recordingDialog->addOData(tools);
 	}
 
+	if (tools.empty()) {
+		ui->m_OdataLabel->setText("O 1:\nstatus: No Tools Detected");
+		return;
+	}
+
 	QString O_text;
 	QString F_text;
-	//text += QString("==== New Frame ====\n");
-	//text += QString("Tool count: %1\n").arg(tools.size());
-	//for (size_t i = 0; i < tools.size()-1; ++i) {
-	//			
-	//}
+	
 	const ToolData& data = tools[0];
 	const Transform& transform = data.transform;
 
@@ -237,42 +269,26 @@ void MainWindow::updateODataLabel(const std::vector<ToolData>& tools)
 		F_text = O_text;
 
 		if (displayWidget) {
-			
-			//Pose p;
-			//p.x = transform.tx;
-			//p.y = transform.ty;
-			//p.z = transform.tz;
-
-			//// 四元数 → 欧拉角
-			//double rx, ry, rz;
-			//quaternionToEuler(transform.q0, transform.qx, transform.qy, transform.qz, rx, ry, rz);
-
-			//p.rx = rx; p.ry = ry; p.rz = rz;
-
-			//displayWidget->updateExternalPose(p);
-
 			vtkSmartPointer<vtkTransform> ndiTransform = vtkSmartPointer<vtkTransform>::New();
+			
+			// 1. 坐标系映射 (仅使用 RotateZ(-90) 即可实现 X=ty, Y=-tx, Z=tz 的右手机映射)
+			// 移除之前的 RotateX(-90)，因为它会使坐标系变为左手系，导致旋转反向
+			ndiTransform->RotateZ(-90.0);
 
-			// 1. 设置位置 
-			ndiTransform->Translate(transform.ty, -transform.tx, transform.tz);
+			// 2. 应用原始 NDI 数据
+			ndiTransform->Translate(transform.tx, transform.ty, transform.tz);
 
-			// 2. 设置旋转 (四元数)
+			double angle = 0.0;
+			if (transform.q0 >= 1.0) angle = 0.0;
+			else if (transform.q0 <= -1.0) angle = 2.0 * M_PI;
+			else angle = 2.0 * acos(transform.q0);
+
 			ndiTransform->RotateWXYZ(
-				vtkMath::DegreesFromRadians(2.0 * acos(transform.q0)), // 角度
-				transform.qx, transform.qy, transform.qz // 旋转轴
+				vtkMath::DegreesFromRadians(angle), 
+				transform.qx, transform.qy, transform.qz
 			);
 
-
-
-			vtkSmartPointer<vtkTransform> coordinateTransform = vtkSmartPointer<vtkTransform>::New();
-			coordinateTransform->RotateZ(-180.0);
-			coordinateTransform->RotateX(-90.0);
-			ndiTransform->Concatenate(coordinateTransform);
 			displayWidget->updateExternalTran(ndiTransform);
-			//displayWidget->applyQuaternionTransform(
-			//	transform.tx, transform.ty, transform.tz,  
-			//	transform.q0, transform.qx, transform.qy, transform.qz 
-			//);
 		}
 
 	}
@@ -280,79 +296,74 @@ void MainWindow::updateODataLabel(const std::vector<ToolData>& tools)
 		O_text = QString("O 1:\n"
 			"status: Missing\n\n");
 
-		cv::Mat Marker1_2EMsensor;
-		loadMatFromTxt("Marker1_2EMsensor.txt", Marker1_2EMsensor);
-		cv::Mat EM_2Marker2;
-		loadMatFromTxt("EM_2Marker2.txt", EM_2Marker2);
+		// 安全检查：确保 M_data 已经初始化，且 O_data 至少包含两个工具（Marker2）
+		if (M_data.empty() || O_data.size() < 2) {
+			F_text = "Fusion: Waiting for more tools/data...";
+		}
+		else {
+			cv::Mat Marker1_2EMsensor;
+			loadMatFromTxt("Marker1_2EMsensor.txt", Marker1_2EMsensor);
+			cv::Mat EM_2Marker2;
+			loadMatFromTxt("EM_2Marker2.txt", EM_2Marker2);
 
+			if (Marker1_2EMsensor.empty() || EM_2Marker2.empty()) {
+				F_text = "Fusion: Calibration files error!";
+			}
+			else {
+				const ToolData& data_M = M_data[0];
+				const Transform& transform_M = data_M.transform;      //包含实时EMsensor_2Aurora (q0,qx,qy,qz,tx,ty,tz)
+				const ToolData& data_O2 = O_data[1];
+				const Transform& transform_O2 = data_O2.transform;    //包含实时Marker2_2Vega (q0,qx,qy,qz,tx,ty,tz)
 
-		const ToolData& data_M = M_data[0];   
-		const Transform& transform_M = data_M.transform;      //包含实时EMsensor_2Aurora (q0,qx,qy,qz,tx,ty,tz)
-		const ToolData& data_O2 = O_data[1];  
-		const Transform& transform_O2 = data_O2.transform;    //包含实时Marker2_2Vega (q0,qx,qy,qz,tx,ty,tz)
-		
-		cv::Mat EMsensor_2Aurora = transformToMatrix(transform_M);
-		cv::Mat Marker2_2Vega = transformToMatrix(transform_O2);
+				cv::Mat EMsensor_2Aurora = transformToMatrix(transform_M);
+				cv::Mat Marker2_2Vega = transformToMatrix(transform_O2);
 
+				// 检查生成的变换矩阵是否有效
+				if (EMsensor_2Aurora.empty() || Marker2_2Vega.empty()) {
+					F_text = "Fusion: Transform matrix error!";
+				}
+				else {
+					cv::Mat output_Marker1_2Vega = Marker2_2Vega * EM_2Marker2 * EMsensor_2Aurora * Marker1_2EMsensor;
 
-		cv::Mat output_Marker1_2Vega = Marker2_2Vega * EM_2Marker2 * EMsensor_2Aurora * Marker1_2EMsensor;
+					double q0, qx, qy, qz, tx, ty, tz;
+					matrixToTransform(output_Marker1_2Vega, q0, qx, qy, qz, tx, ty, tz);
 
-		double q0, qx, qy, qz, tx, ty, tz;
+					F_text = QString("Fusion :\n"
+						"  X=%2 mm, Y=%3 mm, Z=%4 mm\n"
+						"  q0=%5, qx=%6, qy=%7, qz=%8\n"
+						"  status: %9\n\n")
+						.arg(tx, 0, 'f', 2)
+						.arg(ty, 0, 'f', 2)
+						.arg(tz, 0, 'f', 2)
+						.arg(q0, 0, 'f', 4)
+						.arg(qx, 0, 'f', 4)
+						.arg(qy, 0, 'f', 4)
+						.arg(qz, 0, 'f', 4)
+						.arg("Normal");
 
-		matrixToTransform(output_Marker1_2Vega, q0, qx, qy, qz, tx, ty, tz);
-		
+					if (displayWidget) {
+						vtkSmartPointer<vtkTransform> ndiTransform = vtkSmartPointer<vtkTransform>::New();
 
-		F_text = QString("Fusion :\n"
-			"  X=%2 mm, Y=%3 mm, Z=%4 mm\n"
-			"  q0=%5, qx=%6, qy=%7, qz=%8\n"
-			"  status: %9\n\n")
-			.arg(tx, 0, 'f', 2)
-			.arg(ty, 0, 'f', 2)
-			.arg(tz, 0, 'f', 2)
-			.arg(q0, 0, 'f', 4)
-			.arg(qx, 0, 'f', 4)
-			.arg(qy, 0, 'f', 4)
-			.arg(qz, 0, 'f', 4)
-			.arg("Normal");
+						// 1. 坐标映射 (右手系)
+						ndiTransform->RotateZ(-90.0);
 
-		if (displayWidget) {
-			//Pose p;
-			//p.x = tx;
-			//p.y = ty;
-			//p.z = tz;
+						// 2. 原始数据
+						ndiTransform->Translate(tx, ty, tz);
 
-			//// 四元数 → 欧拉角
-			//double rx, ry, rz;
-			//quaternionToEuler(q0, qx, qy, qz, rx, ry, rz);
+						double angle = 0.0;
+						if (q0 >= 1.0) angle = 0.0;
+						else if (q0 <= -1.0) angle = 2.0 * M_PI;
+						else angle = 2.0 * acos(q0);
 
-			//p.rx = rx; p.ry = ry; p.rz = rz;
+						ndiTransform->RotateWXYZ(
+							vtkMath::DegreesFromRadians(angle),
+							qx, qy, qz
+						);
 
-			//displayWidget->updateExternalPose(p);
-
-		
-			//displayWidget->applyQuaternionTransform(
-		 //       tx, ty, tz,  
-			//	q0, qx, qy, qz 
-			//);
-
-			vtkSmartPointer<vtkTransform> ndiTransform = vtkSmartPointer<vtkTransform>::New();
-
-			// 1. 设置位置 
-			ndiTransform->Translate(ty, -tx, tz);
-
-			// 2. 设置旋转 (四元数)
-			ndiTransform->RotateWXYZ(
-				vtkMath::DegreesFromRadians(2.0 * acos(q0)), // 角度
-				qx, qy, qz // 旋转轴
-			);
-
-
-
-			vtkSmartPointer<vtkTransform> coordinateTransform = vtkSmartPointer<vtkTransform>::New();
-			coordinateTransform->RotateZ(-180.0);
-			coordinateTransform->RotateX(-90.0);
-			ndiTransform->Concatenate(coordinateTransform);
-			displayWidget->updateExternalTran(ndiTransform);
+						displayWidget->updateExternalTran(ndiTransform);
+					}
+				}
+			}
 		}
 	}
 
@@ -421,10 +432,19 @@ void MainWindow::onDisplayBtnClicked()
 	displayWidget->raise();
 	displayWidget->activateWindow();
 
-	 //  直接加载 STL 文件
-	displayWidget->loadSTLModel(
-		"D:/Optomagnetic-tracking/OpticalMagneticNavigation/tools/ToolScribing2.stl"
-	);
+	 // 使用相对路径或检查文件是否存在
+	 QString modelPath = QCoreApplication::applicationDirPath() + "/tools/ToolScribing2.stl";
+	 if (!QFile::exists(modelPath)) {
+		 // 如果相对路径不存在，尝试原始硬编码路径作为兜底，但给出警告
+		 modelPath = "D:/Optomagnetic-tracking/OpticalMagneticNavigation/tools/ToolScribing2.stl";
+	 }
+	 
+	displayWidget->loadSTLModel(modelPath.toStdString());
+
+	// 如果当前已经在跟踪中，新打开的显示窗口也要启动动画刷新
+	if ((thread1 && thread1->isRunning()) || (thread2 && thread2->isRunning())) {
+		displayWidget->startRealtimeAnimation();
+	}
 
 	//不启动动画刷新，除非 OnStartTracking() 调用
 }
@@ -468,6 +488,7 @@ void MainWindow::loadMatFromTxt(const std::string &filename, cv::Mat &mat)
     std::ifstream file(fullPath.toStdString()); // 使用完整路径打开文件
     if (!file.is_open()) {
         std::cerr << "无法打开文件: " << fullPath.toStdString() << std::endl; // 打印完整路径
+        mat = cv::Mat(); // 确保返回空矩阵
         return;
     }
 
@@ -481,16 +502,27 @@ void MainWindow::loadMatFromTxt(const std::string &filename, cv::Mat &mat)
         while (ss >> value) {
             rowData.push_back(value);
         }
-        tempData.push_back(rowData);
+        if (!rowData.empty()) {
+            tempData.push_back(rowData);
+        }
+    }
+
+    // 检查是否有数据，防止 tempData[0] 崩溃
+    if (tempData.empty() || tempData[0].empty()) {
+        std::cerr << "文件内容为空或格式错误: " << fullPath.toStdString() << std::endl;
+        mat = cv::Mat();
+        file.close();
+        return;
     }
 
     // 将数据转换为cv::Mat
-    int rows = tempData.size();
-    int cols = tempData[0].size();
+    int rows = (int)tempData.size();
+    int cols = (int)tempData[0].size();
     mat = cv::Mat(rows, cols, CV_64F);
 
     for (int i = 0; i < rows; ++i) {
-        for (int j = 0; j < cols; ++j) {
+        // 确保每一列的大小一致，防止不规则数据导致崩溃
+        for (int j = 0; j < (int)tempData[i].size() && j < cols; ++j) {
             mat.at<double>(i, j) = tempData[i][j];
         }
     }
