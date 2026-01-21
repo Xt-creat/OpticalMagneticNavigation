@@ -35,6 +35,7 @@ private:
 	std::string device1;
 	std::string tool1 ;
 	std::string tool2;
+	std::string tool4;
 	std::string device2;
 	std::string tool3;
 

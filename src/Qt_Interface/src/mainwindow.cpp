@@ -36,19 +36,37 @@ MainWindow::MainWindow(QWidget *parent) :
 {
 	ui->setupUi(this);
 
-	ui->m_OdataLabel->setMinimumHeight(150);
-	ui->m_OdataLabel->setWordWrap(true);
-	ui->m_MdataLabel->setMinimumHeight(150);
-	ui->m_MdataLabel->setWordWrap(true);
-	//ui->m_FusionLabel->setMinimumHeight(150);
-	//ui->m_FusionLabel->setWordWrap(true);
+	// 设置标签的基本属性
+	auto setupDataLabel = [](QLabel* label) {
+		label->setMinimumHeight(100);
+		label->setWordWrap(true);
+		label->setTextInteractionFlags(Qt::TextSelectableByMouse); // 允许选择/复制文本
+		label->setAlignment(Qt::AlignTop | Qt::AlignLeft);
+		label->setStyleSheet(
+			"QLabel {"
+			"  background-color: #f8f9fa;"
+			"  border: 1px solid #dee2e6;"
+			"  border-radius: 6px;"
+			"  padding: 10px;"
+			"  font-family: 'Segoe UI', 'Consolas', monospace;"
+			"  font-size: 14px;"
+			"  line-height: 1.4;"
+			"}"
+		);
+	};
 
+	setupDataLabel(ui->m_OdataLabel);
+	setupDataLabel(ui->m_MdataLabel);
+	setupDataLabel(ui->m_FusionLabel);
 
-	ui->m_systemstatus->setStyleSheet("font-size: 16px;");
-	ui->m_OdataLabel->setStyleSheet("font-size: 16px;");
-	ui->m_MdataLabel->setStyleSheet("font-size: 16px;");
-	ui->m_FusionLabel->setStyleSheet("font-size: 16px;");
-
+	ui->m_systemstatus->setStyleSheet(
+		"QLabel {"
+		"  font-weight: bold;"
+		"  font-size: 18px;"
+		"  padding: 5px;"
+		"  color: #495057;"
+		"}"
+	);
 
 	connect(ui->m_SelectSavePathBtn, &QPushButton::clicked, this, &MainWindow::OnSelectBtnClicked);     //选择数据存储路径
 	m_NDIWorker = new NDIWorker;
@@ -109,11 +127,11 @@ void MainWindow::updateSystemStatus(bool isConnected) {
 	if (isConnected) {
 		m_connected = isConnected;
 		ui->m_systemstatus->setText("Device connection successful");
-		ui->m_systemstatus->setStyleSheet("color: green;"); // 可选：设置绿色文字
+		ui->m_systemstatus->setStyleSheet("color: #28a745; font-weight: bold; font-size: 18px;"); 
 	}
 	else {
 		ui->m_systemstatus->setText("Device not connected");
-		ui->m_systemstatus->setStyleSheet("color: red;");
+		ui->m_systemstatus->setStyleSheet("color: #dc3545; font-weight: bold; font-size: 18px;");
 	}
 
 }
@@ -240,65 +258,76 @@ void MainWindow::updateODataLabel(const std::vector<ToolData>& tools)
 	}
 
 	if (tools.empty()) {
-		ui->m_OdataLabel->setText("O 1:\nstatus: No Tools Detected");
+		ui->m_OdataLabel->setText("<b style='color: #dc3545;'>O: No Tools Detected</b>");
 		return;
 	}
 
-	QString O_text;
+	QString O_text = "<div style='font-family: Segoe UI, sans-serif;'>";
 	QString F_text;
 	
-	const ToolData& data = tools[0];
-	const Transform& transform = data.transform;
+	for (size_t i = 0; i < tools.size(); ++i) {
+		const ToolData& data = tools[i];
+		const Transform& transform = data.transform;
+		QString statusColor = transform.isMissing() ? "#dc3545" : "#28a745";
+		QString statusText = transform.isMissing() ? "Missing" : "Normal";
 
-	//只要DisplayWidget存在，就推送位姿,toolHandle==1对应标准针
-	if (transform.toolHandle == 1 && !transform.isMissing()) {
-		O_text = QString("O %1:\n"
-			"  X=%2 mm, Y=%3 mm, Z=%4 mm\n"
-			"  q0=%5, qx=%6, qy=%7, qz=%8\n"
-			"  status: %9\n\n")
-			.arg(1)
-			.arg(transform.tx, 0, 'f', 2)
-			.arg(transform.ty, 0, 'f', 2)
-			.arg(transform.tz, 0, 'f', 2)
-			.arg(transform.q0, 0, 'f', 4)
-			.arg(transform.qx, 0, 'f', 4)
-			.arg(transform.qy, 0, 'f', 4)
-			.arg(transform.qz, 0, 'f', 4)
-			.arg(transform.isMissing() ? "Missing" : "Normal");
+		O_text += QString(
+			"<div style='margin-bottom: 10px; padding: 5px; border-left: 4px solid %1;'>"
+			"<b>OPTICAL TOOL %2</b> <span style='color: %1; font-weight: bold;'>[%3]</span><br/>"
+			"<table cellspacing='0' cellpadding='2' style='font-family: Consolas, monospace; font-size: 13px;'>"
+			"<tr><td><b>Pos:</b></td><td>X:%4, Y:%5, Z:%6 mm</td></tr>"
+			"<tr><td><b>Rot:</b></td><td>q0:%7, qx:%8, qy:%9, qz:%10</td></tr>"
+			"</table>"
+			"</div>"
+		)
+		.arg(statusColor)
+		.arg(i + 1)
+		.arg(statusText)
+		.arg(transform.tx, 8, 'f', 2)
+		.arg(transform.ty, 8, 'f', 2)
+		.arg(transform.tz, 8, 'f', 2)
+		.arg(transform.q0, 8, 'f', 4)
+		.arg(transform.qx, 8, 'f', 4)
+		.arg(transform.qy, 8, 'f', 4)
+		.arg(transform.qz, 8, 'f', 4);
 
-		F_text = O_text;
+		// 只要第一个工具(通常是标准针)在线，就更新可视化
+		if (i == 0 && transform.toolHandle == 1 && !transform.isMissing()) {
+			F_text = O_text + "</div>";
 
-		if (displayWidget) {
-			vtkSmartPointer<vtkTransform> ndiTransform = vtkSmartPointer<vtkTransform>::New();
-			
-			// 1. 坐标系映射 (仅使用 RotateZ(-90) 即可实现 X=ty, Y=-tx, Z=tz 的右手机映射)
-			// 移除之前的 RotateX(-90)，因为它会使坐标系变为左手系，导致旋转反向
-			ndiTransform->RotateZ(-90.0);
+			if (displayWidget) {
+				vtkSmartPointer<vtkTransform> ndiTransform = vtkSmartPointer<vtkTransform>::New();
+				
+				// 1. 世界坐标系对齐 (将 VTK 空间旋转到符合 NDI 的习惯)
+				ndiTransform->RotateX(-90.0);
 
-			// 2. 应用原始 NDI 数据
-			ndiTransform->Translate(transform.tx, transform.ty, transform.tz);
+				// 2. 坐标系映射 (核心：通过旋转实现 ty, -tx, tz 的映射效果，并同步旋转轴)
+				ndiTransform->RotateZ(-90.0);
 
-			double angle = 0.0;
-			if (transform.q0 >= 1.0) angle = 0.0;
-			else if (transform.q0 <= -1.0) angle = 2.0 * M_PI;
-			else angle = 2.0 * acos(transform.q0);
+				// 3. 应用原始 NDI 数据 (不进行手动交换)
+				ndiTransform->Translate(transform.tx, transform.ty, transform.tz);
 
-			ndiTransform->RotateWXYZ(
-				vtkMath::DegreesFromRadians(angle), 
-				transform.qx, transform.qy, transform.qz
-			);
+				double angle = 0.0;
+				if (transform.q0 >= 1.0) angle = 0.0;
+				else if (transform.q0 <= -1.0) angle = 2.0 * M_PI;
+				else angle = 2.0 * acos(transform.q0);
 
-			displayWidget->updateExternalTran(ndiTransform);
+				ndiTransform->RotateWXYZ(
+					vtkMath::DegreesFromRadians(angle), 
+					transform.qx, transform.qy, transform.qz
+				);
+
+				displayWidget->updateExternalTran(ndiTransform);
+			}
 		}
-
 	}
-	else {
-		O_text = QString("O 1:\n"
-			"status: Missing\n\n");
+	O_text += "</div>";
 
+	// 如果第一个工具丢失，尝试 Fusion 逻辑
+	if (tools[0].transform.isMissing()) {
 		// 安全检查：确保 M_data 已经初始化，且 O_data 至少包含两个工具（Marker2）
 		if (M_data.empty() || O_data.size() < 2) {
-			F_text = "Fusion: Waiting for more tools/data...";
+			F_text = "<i style='color: #6c757d;'>Fusion: Waiting for more tools/data...</i>";
 		}
 		else {
 			cv::Mat Marker1_2EMsensor;
@@ -307,7 +336,7 @@ void MainWindow::updateODataLabel(const std::vector<ToolData>& tools)
 			loadMatFromTxt("EM_2Marker2.txt", EM_2Marker2);
 
 			if (Marker1_2EMsensor.empty() || EM_2Marker2.empty()) {
-				F_text = "Fusion: Calibration files error!";
+				F_text = "<b style='color: #dc3545;'>Fusion: Calibration files error!</b>";
 			}
 			else {
 				const ToolData& data_M = M_data[0];
@@ -320,7 +349,7 @@ void MainWindow::updateODataLabel(const std::vector<ToolData>& tools)
 
 				// 检查生成的变换矩阵是否有效
 				if (EMsensor_2Aurora.empty() || Marker2_2Vega.empty()) {
-					F_text = "Fusion: Transform matrix error!";
+					F_text = "<b style='color: #dc3545;'>Fusion: Transform matrix error!</b>";
 				}
 				else {
 					cv::Mat output_Marker1_2Vega = Marker2_2Vega * EM_2Marker2 * EMsensor_2Aurora * Marker1_2EMsensor;
@@ -328,26 +357,32 @@ void MainWindow::updateODataLabel(const std::vector<ToolData>& tools)
 					double q0, qx, qy, qz, tx, ty, tz;
 					matrixToTransform(output_Marker1_2Vega, q0, qx, qy, qz, tx, ty, tz);
 
-					F_text = QString("Fusion :\n"
-						"  X=%2 mm, Y=%3 mm, Z=%4 mm\n"
-						"  q0=%5, qx=%6, qy=%7, qz=%8\n"
-						"  status: %9\n\n")
-						.arg(tx, 0, 'f', 2)
-						.arg(ty, 0, 'f', 2)
-						.arg(tz, 0, 'f', 2)
-						.arg(q0, 0, 'f', 4)
-						.arg(qx, 0, 'f', 4)
-						.arg(qy, 0, 'f', 4)
-						.arg(qz, 0, 'f', 4)
-						.arg("Normal");
+					F_text = QString(
+						"<div style='padding: 5px; border-left: 4px solid #007bff;'>"
+						"<b style='color: #007bff;'>FUSION DATA</b><br/>"
+						"<table cellspacing='0' cellpadding='2' style='font-family: Consolas, monospace; font-size: 13px;'>"
+						"<tr><td><b>Pos:</b></td><td>X:%1, Y:%2, Z:%3 mm</td></tr>"
+						"<tr><td><b>Rot:</b></td><td>q0:%4, qx:%5, qy:%6, qz:%7</td></tr>"
+						"</table>"
+						"</div>")
+						.arg(tx, 8, 'f', 2)
+						.arg(ty, 8, 'f', 2)
+						.arg(tz, 8, 'f', 2)
+						.arg(q0, 8, 'f', 4)
+						.arg(qx, 8, 'f', 4)
+						.arg(qy, 8, 'f', 4)
+						.arg(qz, 8, 'f', 4);
 
 					if (displayWidget) {
 						vtkSmartPointer<vtkTransform> ndiTransform = vtkSmartPointer<vtkTransform>::New();
 
-						// 1. 坐标映射 (右手系)
+						// 1. 世界对齐
+						ndiTransform->RotateX(-90.0);
+
+						// 2. 坐标映射
 						ndiTransform->RotateZ(-90.0);
 
-						// 2. 原始数据
+						// 3. 原始数据
 						ndiTransform->Translate(tx, ty, tz);
 
 						double angle = 0.0;
@@ -367,7 +402,7 @@ void MainWindow::updateODataLabel(const std::vector<ToolData>& tools)
 		}
 	}
 
-	//QLabel 只显示最近一次结果
+	// 使用 setText 设置 HTML 文本
 	ui->m_OdataLabel->setText(O_text);
 	ui->m_FusionLabel->setText(F_text);
 
@@ -390,27 +425,34 @@ void MainWindow::updateMDataLabel(const std::vector<ToolData>& tools) {
 		m_recordingDialog->addMData(tools);
 	}
 
-	QString text;
+	QString text = "<div style='font-family: Segoe UI, sans-serif;'>";
 	for (size_t i = 0; i < tools.size(); ++i) {
 		const ToolData& data = tools[i];
 		const Transform& transform = data.transform;
+		QString statusColor = transform.isMissing() ? "#dc3545" : "#17a2b8"; // 电磁用青蓝色区分
+		QString statusText = transform.isMissing() ? "Missing" : "Normal";
 
-		text += QString("M %1:\n"
-			"X=%2 mm, Y=%3 mm, Z=%4 mm\n"
-			"q0=%5, qx=%6, qy=%7, qz=%8\n"
-			"status: %9\n\n")
-			.arg(i + 1)
-			.arg(transform.tx, 0, 'f', 2)
-			.arg(transform.ty, 0, 'f', 2)
-			.arg(transform.tz, 0, 'f', 2)
-			.arg(transform.q0, 0, 'f', 4)
-			.arg(transform.qx, 0, 'f', 4)
-			.arg(transform.qy, 0, 'f', 4)
-			.arg(transform.qz, 0, 'f', 4)
-			.arg(transform.isMissing() ? "Missing" : "Normal");
-
-	
+		text += QString(
+			"<div style='margin-bottom: 10px; padding: 5px; border-left: 4px solid %1;'>"
+			"<b>MAGNETIC TOOL %2</b> <span style='color: %1; font-weight: bold;'>[%3]</span><br/>"
+			"<table cellspacing='0' cellpadding='2' style='font-family: Consolas, monospace; font-size: 13px;'>"
+			"<tr><td><b>Pos:</b></td><td>X:%4, Y:%5, Z:%6 mm</td></tr>"
+			"<tr><td><b>Rot:</b></td><td>q0:%7, qx:%8, qy:%9, qz:%10</td></tr>"
+			"</table>"
+			"</div>"
+		)
+		.arg(statusColor)
+		.arg(i + 1)
+		.arg(statusText)
+		.arg(transform.tx, 8, 'f', 2)
+		.arg(transform.ty, 8, 'f', 2)
+		.arg(transform.tz, 8, 'f', 2)
+		.arg(transform.q0, 8, 'f', 4)
+		.arg(transform.qx, 8, 'f', 4)
+		.arg(transform.qy, 8, 'f', 4)
+		.arg(transform.qz, 8, 'f', 4);
 	}
+	text += "</div>";
 	ui->m_MdataLabel->setText(text);
 }
 

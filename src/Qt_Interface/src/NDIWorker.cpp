@@ -38,12 +38,14 @@ NDIWorker::NDIWorker()
 	//tool1 = "8700339.rom";
 	tool1 = "Otool1.rom";
 	tool2 = "20241023.rom";
+	tool4 = "Otool2.rom";
 	device2 = "COM3";
 	tool3 = "080061.rom";
 
 	toolDefinitions1 = std::vector<std::string>();
 	toolDefinitions1.push_back(tool1);
 	toolDefinitions1.push_back(tool2);
+	toolDefinitions1.push_back(tool4);
 	toolDefinitions2 = std::vector<std::string>();
 	toolDefinitions2.push_back(tool3);
 

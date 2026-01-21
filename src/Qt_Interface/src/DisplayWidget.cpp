@@ -158,9 +158,6 @@ void DisplayWidget::loadSTLModel(const std::string& filePath)
     coneActor = vtkSmartPointer<vtkActor>::New();
     coneActor->SetMapper(mapper);
 
-    // 修正模型方向：如果模型背对 Y 轴，绕其向上方向（VTK Z轴）旋转 180 度
-    coneActor->RotateZ(180.0); 
-
     //  如果 STL 太大/太小/方向错，可以修正：
     coneActor->SetScale(1);            // 比例（可调，比如0.1缩小10倍）
 
@@ -211,14 +208,14 @@ void DisplayWidget::addTrackingSideWalls(double scaleFactor)
     double zMax = -950 * scaleFactor;
 
     double pts[8][3] = {
-        { 262 * scaleFactor, -310 * scaleFactor, zMax},    // p1 (yMax_near, -xMax_near, zMax)
-        { 656 * scaleFactor, -783 * scaleFactor, zMin},    // p2 (yMax_far, -xMax_far, zMin)
-        { 262 * scaleFactor,  310 * scaleFactor, zMax},    // p3 (yMax_near, -xMin_near, zMax)
-        { 656 * scaleFactor,  783 * scaleFactor, zMin},    // p4 (yMax_far, -xMin_far, zMin)
-        {-262 * scaleFactor, -310 * scaleFactor, zMax},    // p5 (yMin_near, -xMax_near, zMax)
-        {-656 * scaleFactor, -783 * scaleFactor, zMin},    // p6 (yMin_far, -xMax_far, zMin)
-        {-262 * scaleFactor,  310 * scaleFactor, zMax},    // p7 (yMin_near, -xMin_near, zMax)
-        {-656 * scaleFactor,  783 * scaleFactor, zMin}     // p8 (yMin_far, -xMin_far, zMin)
+        { 262 * scaleFactor,  zMax,  310 * scaleFactor},    // p1 (yMax_small, zMax, xMax_small)
+        { 656 * scaleFactor,  zMin,  783 * scaleFactor},    // p2 (yMax_large, zMin, xMax_large)
+        { 262 * scaleFactor,  zMax, -310 * scaleFactor},    // p3 (yMax_small, zMax, xMin_small)
+        { 656 * scaleFactor,  zMin, -783 * scaleFactor},    // p4 (yMax_large, zMin, xMin_large)
+        {-262 * scaleFactor,  zMax,  310 * scaleFactor},    // p5 (yMin_small, zMax, xMax_small)
+        {-656 * scaleFactor,  zMin,  783 * scaleFactor},    // p6 (yMin_large, zMin, xMax_large)
+        {-262 * scaleFactor,  zMax, -310 * scaleFactor},    // p7 (yMin_small, zMax, xMin_small)
+        {-656 * scaleFactor,  zMin, -783 * scaleFactor}     // p8 (yMin_large, zMin, xMin_large)
     };
 
     auto points = vtkSmartPointer<vtkPoints>::New();
