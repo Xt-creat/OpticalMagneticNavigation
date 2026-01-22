@@ -27,15 +27,23 @@ struct TrackedData
 	cv::Mat R;  //旋转矩阵
 };
 
-
+struct CalibrationError {
+	double avgTranslationError;
+	double avgRotationError;
+	std::vector<double> translationErrors;
+	std::vector<double> rotationErrors;
+};
 
 
 class CAPICOMMON_API OMCalibrate
 {
 public:
 	OMCalibrate();
+	OMCalibrate(const std::string& path, int group = 30);
 
 	~OMCalibrate();
+
+	void LoadData(const std::string& path, int group = 30);
 
 	void HandeyeCalibrate();  //求解两次AX=XB，计算M12EMS和EM2M2
 
@@ -49,6 +57,7 @@ public:
 
 	void saveVectorMatToTxt(const std::vector<cv::Mat>& matrices, const std::string& filename);
 
+	CalibrationError EvaluateCalibration();
 
 
 //private:

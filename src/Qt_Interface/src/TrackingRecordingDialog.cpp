@@ -39,10 +39,8 @@ void TrackingRecordingDialog::onStartRecording()
     m_magneticFile.open(magneticPath.toStdString(), std::ios::out);
 
     if (m_opticalFile.is_open() && m_magneticFile.is_open()) {
-        // 写入符合要求的表头格式
-        std::string header = "ToolInfo,Frame#,PortHandle,Face#,timespec_s,timespec_ns,TransformStatus,Q0,Qx,Qy,Qz,Tx,Ty,Tz,Error,#Markers,Markers_Data(Status,X,Y,Z...)\n";
-        m_opticalFile << header;
-        m_magneticFile << header;
+        m_headerWrittenO = false; // 重置标志位
+        m_headerWrittenM = false;
 
         m_isRecording = true;
         m_recordStartTime = QDateTime::currentDateTime();
@@ -91,6 +89,10 @@ void TrackingRecordingDialog::onUpdateTime()
 void TrackingRecordingDialog::addOData(const std::vector<ToolData>& tools)
 {
     if (m_isRecording && m_opticalFile.is_open()) {
+        if (!m_headerWrittenO && !tools.empty()) {
+            writeHeader(m_opticalFile, tools);
+            m_headerWrittenO = true;
+        }
         writeToolDataToCSV(m_opticalFile, tools);
     }
 }
@@ -98,22 +100,38 @@ void TrackingRecordingDialog::addOData(const std::vector<ToolData>& tools)
 void TrackingRecordingDialog::addMData(const std::vector<ToolData>& tools)
 {
     if (m_isRecording && m_magneticFile.is_open()) {
+        if (!m_headerWrittenM && !tools.empty()) {
+            writeHeader(m_magneticFile, tools);
+            m_headerWrittenM = true;
+        }
         writeToolDataToCSV(m_magneticFile, tools);
     }
+}
+
+void TrackingRecordingDialog::writeHeader(std::ofstream& file, const std::vector<ToolData>& tools) {
+    file << "ToolCount";
+    for (size_t t = 0; t < tools.size(); t++) {
+        file << ",ToolInfo,Frame#,PortHandle,Face#,timespec_s,timespec_ns,"
+            "TransformStatus,Q0,Qx,Qy,Qz,Tx,Ty,Tz,Error,#Markers";
+        for (int m = 0; m < (int)tools[t].markers.size(); m++) {
+            file << ",Marker" << m << ".Status,Tx,Ty,Tz";
+        }
+    }
+    file << std::endl;
 }
 
 void TrackingRecordingDialog::writeToolDataToCSV(std::ofstream& file, const std::vector<ToolData>& tools)
 {
     if (tools.empty()) return;
 
-    // 将同一帧的所有工具数据拼接在同一行
+    // 每行以工具数量开头
+    file << tools.size();
+
+    // 顺序写入每个工具的数据
     for (size_t i = 0; i < tools.size(); ++i) {
-        file << toolDataToCSVRow(tools[i]);
-        if (i < tools.size() - 1) {
-            file << ","; // 工具之间用逗号分隔
-        }
+        file << "," << toolDataToCSVRow(tools[i]);
     }
-    file << "\n"; // 整行结束后换行
+    file << "\n"; 
 }
 
 std::string TrackingRecordingDialog::toolDataToCSVRow(const ToolData& toolData)
@@ -121,7 +139,6 @@ std::string TrackingRecordingDialog::toolDataToCSVRow(const ToolData& toolData)
     std::stringstream ss;
     ss << std::setprecision(toolData.PRECISION);
     
-    // 补全所有字段：ToolInfo, Frame#, PortHandle, Face#, timespec_s, timespec_ns
     ss << toolData.toolInfo << ","
        << toolData.frameNumber << ","
        << "Port:" << static_cast<unsigned>(toolData.transform.toolHandle) << ","
@@ -129,23 +146,23 @@ std::string TrackingRecordingDialog::toolDataToCSVRow(const ToolData& toolData)
        << toolData.timespec_s << "," << toolData.timespec_ns << ",";
     
     if (toolData.transform.isMissing()) {
-        ss << "Missing,,,,,,,,"; // TransformStatus, Q0, Qx, Qy, Qz, Tx, Ty, Tz, Error
+        ss << "Missing,,,,,,,,"; 
     } else {
-        ss << "Normal,"
+        ss << "Enabled," // 使用与 Vega.csv 一致的状态词
            << toolData.transform.q0 << "," << toolData.transform.qx << ","
            << toolData.transform.qy << "," << toolData.transform.qz << ","
            << toolData.transform.tx << "," << toolData.transform.ty << ","
            << toolData.transform.tz << "," << toolData.transform.error;
     }
 
-    // 写入标志点数据：#Markers, Marker0.Status, Tx, Ty, Tz, ...
+    // 写入标志点数据
     ss << "," << toolData.markers.size();
-    for (const auto& marker : toolData.markers) {
-        ss << "," << static_cast<int>(marker.status);
-        if (marker.status == 0x01) { // MarkerStatus::Missing
-            ss << ",,,";
+    for (int i = 0; i < (int)toolData.markers.size(); i++) {
+        const auto& marker = toolData.markers[i];
+        if (marker.status == 0x01 || marker.status == 0x02) { // Missing 或 OutOfVolume
+            ss << ",Missing,,,";
         } else {
-            ss << "," << marker.x << "," << marker.y << "," << marker.z;
+            ss << ",OK," << marker.x << "," << marker.y << "," << marker.z;
         }
     }
 

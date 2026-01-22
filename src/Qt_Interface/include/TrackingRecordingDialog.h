@@ -29,6 +29,7 @@ private slots:
     void onUpdateTime();
 
 private:
+    void writeHeader(std::ofstream& file, const std::vector<ToolData>& tools); // 新增：写表头
     void writeToolDataToCSV(std::ofstream& file, const std::vector<ToolData>& tools);
     std::string toolDataToCSVRow(const ToolData& toolData);
 
@@ -40,6 +41,8 @@ private:
     
     std::ofstream m_opticalFile;
     std::ofstream m_magneticFile;
+    bool m_headerWrittenO = false; // 新增：光学表头标志
+    bool m_headerWrittenM = false; // 新增：电磁表头标志
     QTimer* m_timer;
 };
 

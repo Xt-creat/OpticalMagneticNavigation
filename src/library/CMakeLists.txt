@@ -32,6 +32,9 @@ target_sources(Library PRIVATE ${SOURCES} ${HEADERS})
 # OpenCV 4.5到4.10版本, 仅CMake3.26以上支持按照版本区间的查找
 find_package(OpenCV 4.5...4.10 REQUIRED)
 
+# 查找 Eigen3 库
+find_package(Eigen3 REQUIRED)
+
 # VTK 8.1到9.5版本
 find_package(VTK 8.1...9.5 REQUIRED )
 message(STATUS "VTK Libraries: ${VTK_LIBRARIES}")
@@ -40,8 +43,8 @@ message(STATUS "VTK Libraries: ${VTK_LIBRARIES}")
 target_include_directories(Library PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${CMAKE_CURRENT_SOURCE_DIR}/src/include
+    ${EIGEN3_INCLUDE_DIRS}
     ${VTK_INCLUDE_DIRS}
-    ${PCL_INCLUDE_DIRS}
 )
 
 # 可选：设置输出目录

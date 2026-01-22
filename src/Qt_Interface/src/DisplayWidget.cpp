@@ -200,22 +200,30 @@ void DisplayWidget::loadSTLModel(const std::string& filePath)
 void DisplayWidget::addTrackingSideWalls(double scaleFactor)
 {
     
-    double xMin = -783 * scaleFactor;
-    double xMax = 783 * scaleFactor;
-    double yMin = -656 * scaleFactor;
-    double yMax = 656 * scaleFactor;
+    // 远端大边界 (at zMin)
+    double xMax = 656 * scaleFactor;
+    double xMin = -xMax;
+    double yMax = 783 * scaleFactor;
+    double yMin = -yMax;
+
+    // 近端小边界 (at zMax)
+    double xMaxSmall = 262 * scaleFactor;
+    double xMinSmall = -xMaxSmall;
+    double yMaxSmall = 310 * scaleFactor;
+    double yMinSmall = -yMaxSmall;
+
     double zMin = -2400 * scaleFactor;
     double zMax = -950 * scaleFactor;
 
     double pts[8][3] = {
-        { 262 * scaleFactor,  zMax,  310 * scaleFactor},    // p1 (yMax_small, zMax, xMax_small)
-        { 656 * scaleFactor,  zMin,  783 * scaleFactor},    // p2 (yMax_large, zMin, xMax_large)
-        { 262 * scaleFactor,  zMax, -310 * scaleFactor},    // p3 (yMax_small, zMax, xMin_small)
-        { 656 * scaleFactor,  zMin, -783 * scaleFactor},    // p4 (yMax_large, zMin, xMin_large)
-        {-262 * scaleFactor,  zMax,  310 * scaleFactor},    // p5 (yMin_small, zMax, xMax_small)
-        {-656 * scaleFactor,  zMin,  783 * scaleFactor},    // p6 (yMin_large, zMin, xMax_large)
-        {-262 * scaleFactor,  zMax, -310 * scaleFactor},    // p7 (yMin_small, zMax, xMin_small)
-        {-656 * scaleFactor,  zMin, -783 * scaleFactor}     // p8 (yMin_large, zMin, xMin_large)
+        { yMaxSmall, zMax, xMaxSmall }, // p1
+        { yMax,      zMin, xMax      }, // p2
+        { yMaxSmall, zMax, xMinSmall }, // p3
+        { yMax,      zMin, xMin      }, // p4
+        { yMinSmall, zMax, xMaxSmall }, // p5
+        { yMin,      zMin, xMax      }, // p6
+        { yMinSmall, zMax, xMinSmall }, // p7
+        { yMin,      zMin, xMin      }  // p8
     };
 
     auto points = vtkSmartPointer<vtkPoints>::New();

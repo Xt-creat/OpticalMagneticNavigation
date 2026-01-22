@@ -33,11 +33,11 @@ private:
 	std::string toolDataToCSV(const ToolData& toolData);
 
 	std::string device1;
-	std::string tool1 ;
-	std::string tool2;
-	std::string tool4;
+	std::string otool1_rom;
+	std::string otool3_rom;
+	std::string otool2_rom;
 	std::string device2;
-	std::string tool3;
+	std::string mtool_rom;
 
 	std::vector<std::string> toolDefinitions1;
 	std::vector<std::string> toolDefinitions2;

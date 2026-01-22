@@ -34,20 +34,18 @@ extern CombinedApi M_capi;
 NDIWorker::NDIWorker()
 {
 	device1 = "P9-01077";
-	//device1 = "P9-14811";
-	//tool1 = "8700339.rom";
-	tool1 = "Otool1.rom";
-	tool2 = "20241023.rom";
-	tool4 = "Otool2.rom";
+	otool1_rom = "Otool1.rom";
+	otool2_rom = "Otool2.rom";
+	otool3_rom = "Otool3.rom";
 	device2 = "COM3";
-	tool3 = "080061.rom";
+	mtool_rom = "080061.rom";
 
 	toolDefinitions1 = std::vector<std::string>();
-	toolDefinitions1.push_back(tool1);
-	toolDefinitions1.push_back(tool2);
-	toolDefinitions1.push_back(tool4);
+	toolDefinitions1.push_back(otool1_rom);
+	toolDefinitions1.push_back(otool2_rom);
+	toolDefinitions1.push_back(otool3_rom);
 	toolDefinitions2 = std::vector<std::string>();
-	toolDefinitions2.push_back(tool3);
+	toolDefinitions2.push_back(mtool_rom);
 
 }
 

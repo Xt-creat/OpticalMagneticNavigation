@@ -3,8 +3,6 @@
 
 #include <QMainWindow>
 #include <QImage>
-#include <LoadCaptureUS.h>
-#include <WriteCaptureUS.h>
 #include "NDIWorker.h"
 #include"DeviceReader.h"
 #include "DisplayWidget.h" 
@@ -48,17 +46,18 @@ public:
 private slots:
 	void OnSelectBtnClicked();
 	void OnStartBtnClicked();
-	
 	void updateSystemStatus(bool isConnected);
 
 	void OnStartTracking();
 	void OnStopTracking();
-	
+
+	void onDisplayBtnClicked();  
 
 	void updateODataLabel(const std::vector<ToolData>& tools);
 	void updateMDataLabel(const std::vector<ToolData>& tools);
 
-	void onDisplayBtnClicked();  
+	void stopTrackingThreads(); // 新增：停止跟踪线程
+	void startTrackingThreads(); // 新增：启动跟踪线程
 
 	////四元数和平移转矩阵
 	//void MainWindow::PinErrorRMS();
@@ -75,6 +74,7 @@ private:
 
 	DisplayWidget* displayWidget = nullptr;  // 保存显示窗口指针
 	TrackingRecordingDialog* m_recordingDialog = nullptr;
+	class CalibrationDialog* m_calibrationDialog = nullptr; // 新增：标定对话框指针
 };
 
 #endif // MAINWINDOW_H

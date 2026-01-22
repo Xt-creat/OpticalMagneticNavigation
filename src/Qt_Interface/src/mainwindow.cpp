@@ -47,18 +47,23 @@ MainWindow::MainWindow(QWidget *parent) :
 			"  background-color: #f8f9fa;"
 			"  border: 1px solid #dee2e6;"
 			"  border-radius: 6px;"
-			"  padding: 10px;"
+			"  padding: 8px;"
 			"  font-family: 'Segoe UI', 'Consolas', monospace;"
-			"  font-size: 14px;"
-			"  line-height: 1.4;"
+			"  font-size: 18px;"
+			"  font-weight: bold;"
+			"  color: #495057;"
+			"  line-height: 1.2;"
 			"}"
 		);
 	};
 
 	setupDataLabel(ui->m_OdataLabel);
+	ui->m_OdataLabel->setMinimumHeight(200); // 调大光学数据的最小高度
+	
 	setupDataLabel(ui->m_MdataLabel);
 	setupDataLabel(ui->m_FusionLabel);
 
+	ui->m_systemstatus->setMaximumHeight(40); // 限制系统状态区域的纵向尺寸
 	ui->m_systemstatus->setStyleSheet(
 		"QLabel {"
 		"  font-weight: bold;"
@@ -74,8 +79,12 @@ MainWindow::MainWindow(QWidget *parent) :
 	connect(ui->m_LinkBtn, &QPushButton::clicked, m_NDIWorker, &NDIWorker::LinkNDI);                     //连接设备
 	connect(m_NDIWorker, &NDIWorker::linkStatusChanged, this, &MainWindow::updateSystemStatus);
 	connect(ui->m_CalibrateBtn, &QPushButton::clicked, this, &MainWindow::OnStartBtnClicked);               //系统标定
-	connect(ui->m_TrackingBtn, &QPushButton::clicked, this, &MainWindow::OnStartTracking);                 //开始跟踪
-	connect(ui->m_StopBtn, &QPushButton::clicked, this, &MainWindow::OnStopTracking);             //停止跟踪
+	
+	ui->m_TrackingBtn->setCheckable(true);
+	connect(ui->m_TrackingBtn, &QPushButton::clicked, this, &MainWindow::OnStartTracking);                 //开始/停止跟踪
+	
+	connect(ui->m_StopBtn, &QPushButton::clicked, this, &MainWindow::OnStopTracking);             //数据记录
+	ui->m_StopBtn->setText(QString::fromLocal8Bit("数据记录"));
 
 	connect(ui->m_DisplayBtn, &QPushButton::clicked, this, &MainWindow::onDisplayBtnClicked);     //可视化
 
@@ -117,8 +126,28 @@ MainWindow::~MainWindow()
 
 void MainWindow::OnStartBtnClicked()
 {
-	 CalibrationDialog *dialog = new CalibrationDialog(m_savePath, this);
-	 dialog->show();
+	if (!m_connected) {
+		QMessageBox::warning(this, QString::fromLocal8Bit("警告"), QString::fromLocal8Bit("设备未连接，请先连接设备！"));
+		return;
+	}
+
+	// 检查是否正在跟踪，标定需要实时数据
+	bool isTracking = (thread1 && thread1->isRunning()) || (thread2 && thread2->isRunning());
+	if (!isTracking) {
+		QMessageBox::warning(this, QString::fromLocal8Bit("警告"), QString::fromLocal8Bit("请先开启“跟踪”模式后再进行标定数据采集！"));
+		return;
+	}
+
+	if (!m_calibrationDialog) {
+		m_calibrationDialog = new CalibrationDialog(m_savePath, this);
+		m_calibrationDialog->setAttribute(Qt::WA_DeleteOnClose);
+		connect(m_calibrationDialog, &QObject::destroyed, [this]() {
+			m_calibrationDialog = nullptr;
+		});
+		m_calibrationDialog->show(); // 非模态显示，这样主界面依然可以操作和刷新
+	}
+	m_calibrationDialog->raise();
+	m_calibrationDialog->activateWindow();
 }
 
 
@@ -140,76 +169,58 @@ void MainWindow::updateSystemStatus(bool isConnected) {
 void MainWindow::OnStartTracking()
 {
 	if (!m_connected) {
-		ui->m_systemstatus->setText("Device not connected");
-		ui->m_systemstatus->setStyleSheet("color: red;");
+		ui->m_systemstatus->setText(QString::fromLocal8Bit("设备未连接"));
+		ui->m_systemstatus->setStyleSheet("color: #dc3545; font-weight: bold; font-size: 18px;");
+		ui->m_TrackingBtn->setChecked(false);
 		return;
 	}
 
-	// --- 关键修复：检查是否已经在跟踪中 ---
-	// 如果线程已经存在且在运行，说明系统正在采集数据，只需处理对话框逻辑
-	if ((thread1 && thread1->isRunning()) || (thread2 && thread2->isRunning())) {
-		if (!m_recordingDialog) {
-			m_recordingDialog = new TrackingRecordingDialog(m_savePath, this);
-			m_recordingDialog->setAttribute(Qt::WA_DeleteOnClose);
-			connect(m_recordingDialog, &QObject::destroyed, [this]() {
-				m_recordingDialog = nullptr;
-				});
-		}
-		m_recordingDialog->show();
-		m_recordingDialog->raise();
-		return;
-	}
+	bool isTracking = ui->m_TrackingBtn->isChecked();
 
-	// 只有在没启动时才执行启动流程，不再盲目调用 OnStopTracking()
+	if (isTracking) {
+		startTrackingThreads();
+	} else {
+		stopTrackingThreads();
+	}
+}
+
+void MainWindow::startTrackingThreads()
+{
 	O_capi.startTracking();
 	M_capi.startTracking();
 
-	//  只有在可视化窗口存在的情况下才启动动画
 	if (displayWidget) {
 		displayWidget->startRealtimeAnimation();
 	}
 
-		deviceReader1 = new DeviceReader(1, 100); // 每100ms读取一次
-		deviceReader2 = new DeviceReader(2, 50); // 每50ms读取一次,电磁位姿更新更快，读取频率也设的更高
-	    // 创建线程并将 DeviceReader 移到线程中
-		thread1 = new QThread(this);
-		deviceReader1->moveToThread(thread1);
-		connect(thread1, &QThread::started, deviceReader1, &DeviceReader::startReading);
-		connect(deviceReader1, &DeviceReader::newODataAvailable, this, &MainWindow::updateODataLabel);
+	deviceReader1 = new DeviceReader(1, 100); 
+	deviceReader2 = new DeviceReader(2, 50); 
+	
+	thread1 = new QThread(this);
+	deviceReader1->moveToThread(thread1);
+	connect(thread1, &QThread::started, deviceReader1, &DeviceReader::startReading);
+	connect(deviceReader1, &DeviceReader::newODataAvailable, this, &MainWindow::updateODataLabel);
 
-		thread2 = new QThread(this);
-		deviceReader2->moveToThread(thread2);
-		connect(thread2, &QThread::started, deviceReader2, &DeviceReader::startReading);
-		connect(deviceReader2, &DeviceReader::newMDataAvailable, this, &MainWindow::updateMDataLabel);
+	thread2 = new QThread(this);
+	deviceReader2->moveToThread(thread2);
+	connect(thread2, &QThread::started, deviceReader2, &DeviceReader::startReading);
+	connect(deviceReader2, &DeviceReader::newMDataAvailable, this, &MainWindow::updateMDataLabel);
 
-		// 启动线程
-		thread1->start();
-		thread2->start();
+	thread1->start();
+	thread2->start();
 
-		ui->m_systemstatus->setText("Tracking in progress");
-		ui->m_systemstatus->setStyleSheet("color: green;");
-
-		// 显示记录对话框
-		if (!m_recordingDialog) {
-			m_recordingDialog = new TrackingRecordingDialog(m_savePath, this);
-			m_recordingDialog->setAttribute(Qt::WA_DeleteOnClose);
-			connect(m_recordingDialog, &QObject::destroyed, [this]() {
-				m_recordingDialog = nullptr;
-				});
-		}
-		m_recordingDialog->show();
-		m_recordingDialog->raise();
+	ui->m_systemstatus->setText(QString::fromLocal8Bit("跟踪中..."));
+	ui->m_systemstatus->setStyleSheet("color: #28a745; font-weight: bold; font-size: 18px;");
+	ui->m_TrackingBtn->setText(QString::fromLocal8Bit("停止跟踪"));
 }
 
-void MainWindow::OnStopTracking() {
-	
-	// 1. --- 关键修复：必须先停止后台线程，再停止硬件 ---
-	// 停止线程1
+void MainWindow::stopTrackingThreads()
+{
 	if (thread1) {
 		disconnect(deviceReader1, &DeviceReader::newODataAvailable, this, &MainWindow::updateODataLabel);
 		QMetaObject::invokeMethod(deviceReader1, "stop", Qt::QueuedConnection);
 		thread1->quit();
-		if (!thread1->wait(1000)) { // 给线程 1 秒时间退出
+		if (!thread1->wait(1000)) {
 			thread1->terminate();
 			thread1->wait();
 		}
@@ -219,7 +230,6 @@ void MainWindow::OnStopTracking() {
 		thread1 = nullptr;
 	}
 
-	// 停止线程2
 	if (thread2) {
 		disconnect(deviceReader2, &DeviceReader::newMDataAvailable, this, &MainWindow::updateMDataLabel);
 		QMetaObject::invokeMethod(deviceReader2, "stop", Qt::QueuedConnection);
@@ -234,19 +244,30 @@ void MainWindow::OnStopTracking() {
 		thread2 = nullptr;
 	}
 
-	// 2. 线程完全退出后，再停止设备硬件跟踪
 	O_capi.stopTracking();
 	M_capi.stopTracking();
 
-	// 确保录制对话框也被清理
-	if (m_recordingDialog) {
-		m_recordingDialog->close();
-		m_recordingDialog = nullptr;
+	ui->m_systemstatus->setText(QString::fromLocal8Bit("跟踪已停止"));
+	ui->m_systemstatus->setStyleSheet("color: #fd7e14; font-weight: bold; font-size: 18px;");
+	ui->m_TrackingBtn->setText(QString::fromLocal8Bit("开始跟踪"));
+}
+
+void MainWindow::OnStopTracking() {
+	// 此函数现在对应 UI 上的“数据记录”按钮 (m_StopBtn)
+	if (!((thread1 && thread1->isRunning()) || (thread2 && thread2->isRunning()))) {
+		QMessageBox::information(this, QString::fromLocal8Bit("提示"), QString::fromLocal8Bit("请先开启“跟踪”模式后再进行数据记录！"));
+		return;
 	}
 
-	// UI 状态恢复
-	ui->m_systemstatus->setText("Tracking has been stopped");
-	ui->m_systemstatus->setStyleSheet("color: orange;");
+	if (!m_recordingDialog) {
+		m_recordingDialog = new TrackingRecordingDialog(m_savePath, this);
+		m_recordingDialog->setAttribute(Qt::WA_DeleteOnClose);
+		connect(m_recordingDialog, &QObject::destroyed, [this]() {
+			m_recordingDialog = nullptr;
+			});
+	}
+	m_recordingDialog->show();
+	m_recordingDialog->raise();
 }
 
 void MainWindow::updateODataLabel(const std::vector<ToolData>& tools)
@@ -257,77 +278,90 @@ void MainWindow::updateODataLabel(const std::vector<ToolData>& tools)
 		m_recordingDialog->addOData(tools);
 	}
 
+	if (m_calibrationDialog) {
+		m_calibrationDialog->addOData(tools);
+	}
+
+	QString header = QString("<div style='font-size: 18px; font-weight: bold; color: #495057; margin-bottom: 10px;'>%1</div>")
+		.arg(QString::fromLocal8Bit("光学数据"));
+	QString fusionHeader = QString("<div style='font-size: 18px; font-weight: bold; color: #495057; margin-bottom: 10px;'>%1</div>")
+		.arg(QString::fromLocal8Bit("融合数据"));
+
 	if (tools.empty()) {
-		ui->m_OdataLabel->setText("<b style='color: #dc3545;'>O: No Tools Detected</b>");
+		ui->m_OdataLabel->setText(header + "<b style='color: #dc3545;'>O: No Tools Detected</b>");
+		ui->m_FusionLabel->setText(fusionHeader + "<i style='color: #6c757d; font-size:14px;'>Fusion: Waiting for tools...</i>");
 		return;
 	}
 
-	QString O_text = "<div style='font-family: Segoe UI, sans-serif;'>";
-	QString F_text;
+	QString O_text = header + "<div style='font-family: Segoe UI, sans-serif;'>";
+	QString F_text = fusionHeader;
 	
-	for (size_t i = 0; i < tools.size(); ++i) {
+	for (size_t i = 0; i < tools.size() && i < 3; ++i) {
 		const ToolData& data = tools[i];
 		const Transform& transform = data.transform;
 		QString statusColor = transform.isMissing() ? "#dc3545" : "#28a745";
 		QString statusText = transform.isMissing() ? "Missing" : "Normal";
 
+		QString dataText = "";
+		if (!transform.isMissing()) {
+			dataText = QString("X:%1, Y:%2, Z:%3 mm | Rot: q0:%4, qx:%5, qy:%6, qz:%7")
+				.arg(transform.tx, 7, 'f', 2)
+				.arg(transform.ty, 7, 'f', 2)
+				.arg(transform.tz, 7, 'f', 2)
+				.arg(transform.q0, 7, 'f', 4)
+				.arg(transform.qx, 7, 'f', 4)
+				.arg(transform.qy, 7, 'f', 4)
+				.arg(transform.qz, 7, 'f', 4);
+		}
+
 		O_text += QString(
-			"<div style='margin-bottom: 10px; padding: 5px; border-left: 4px solid %1;'>"
-			"<b>OPTICAL TOOL %2</b> <span style='color: %1; font-weight: bold;'>[%3]</span><br/>"
-			"<table cellspacing='0' cellpadding='2' style='font-family: Consolas, monospace; font-size: 13px;'>"
-			"<tr><td><b>Pos:</b></td><td>X:%4, Y:%5, Z:%6 mm</td></tr>"
-			"<tr><td><b>Rot:</b></td><td>q0:%7, qx:%8, qy:%9, qz:%10</td></tr>"
-			"</table>"
+			"<div style='margin-bottom: 15px; border-left: 5px solid %1; padding-left: 8px;'>"
+			"<b>O%2</b> <span style='color:%1; font-weight:bold;'>[%3]</span> "
+			"<span style='font-family:Consolas; font-size:16px; font-weight:normal;'>%4</span>"
 			"</div>"
 		)
 		.arg(statusColor)
 		.arg(i + 1)
 		.arg(statusText)
-		.arg(transform.tx, 8, 'f', 2)
-		.arg(transform.ty, 8, 'f', 2)
-		.arg(transform.tz, 8, 'f', 2)
-		.arg(transform.q0, 8, 'f', 4)
-		.arg(transform.qx, 8, 'f', 4)
-		.arg(transform.qy, 8, 'f', 4)
-		.arg(transform.qz, 8, 'f', 4);
+		.arg(dataText);
 
 		// 只要第一个工具(通常是标准针)在线，就更新可视化
 		if (i == 0 && transform.toolHandle == 1 && !transform.isMissing()) {
-			F_text = O_text + "</div>";
+			F_text = fusionHeader + O_text.mid(header.length()) + "</div>";
 
-			if (displayWidget) {
-				vtkSmartPointer<vtkTransform> ndiTransform = vtkSmartPointer<vtkTransform>::New();
-				
-				// 1. 世界坐标系对齐 (将 VTK 空间旋转到符合 NDI 的习惯)
-				ndiTransform->RotateX(-90.0);
+		if (displayWidget) {
+			vtkSmartPointer<vtkTransform> ndiTransform = vtkSmartPointer<vtkTransform>::New();
+			
+			// 1. 世界坐标系对齐 (将 VTK 空间旋转到符合 NDI 的习惯)
+			ndiTransform->RotateX(-90.0);
 
-				// 2. 坐标系映射 (核心：通过旋转实现 ty, -tx, tz 的映射效果，并同步旋转轴)
-				ndiTransform->RotateZ(-90.0);
+			// 2. 坐标系映射 (核心：通过旋转实现 ty, -tx, tz 的映射效果，并同步旋转轴)
+			ndiTransform->RotateZ(-90.0);
 
-				// 3. 应用原始 NDI 数据 (不进行手动交换)
-				ndiTransform->Translate(transform.tx, transform.ty, transform.tz);
+			// 3. 应用原始 NDI 数据 (不进行手动交换)
+			ndiTransform->Translate(transform.tx, transform.ty, transform.tz);
 
-				double angle = 0.0;
-				if (transform.q0 >= 1.0) angle = 0.0;
-				else if (transform.q0 <= -1.0) angle = 2.0 * M_PI;
-				else angle = 2.0 * acos(transform.q0);
+			double angle = 0.0;
+			if (transform.q0 >= 1.0) angle = 0.0;
+			else if (transform.q0 <= -1.0) angle = 2.0 * M_PI;
+			else angle = 2.0 * acos(transform.q0);
 
-				ndiTransform->RotateWXYZ(
-					vtkMath::DegreesFromRadians(angle), 
-					transform.qx, transform.qy, transform.qz
-				);
+			ndiTransform->RotateWXYZ(
+				vtkMath::DegreesFromRadians(angle), 
+				transform.qx, transform.qy, transform.qz
+			);
 
-				displayWidget->updateExternalTran(ndiTransform);
-			}
+			displayWidget->updateExternalTran(ndiTransform);
+		}
 		}
 	}
 	O_text += "</div>";
 
 	// 如果第一个工具丢失，尝试 Fusion 逻辑
 	if (tools[0].transform.isMissing()) {
-		// 安全检查：确保 M_data 已经初始化，且 O_data 至少包含两个工具（Marker2）
-		if (M_data.empty() || O_data.size() < 2) {
-			F_text = "<i style='color: #6c757d;'>Fusion: Waiting for more tools/data...</i>";
+		// 安全检查：确保 M_data 已经初始化，且 O_data 至少包含三个工具（需使用 Otool3 作为参考）
+		if (M_data.empty() || O_data.size() < 3) {
+			F_text = fusionHeader + "<i style='color: #6c757d; font-size:14px;'>Fusion: Waiting for more tools...</i>";
 		}
 		else {
 			cv::Mat Marker1_2EMsensor;
@@ -339,13 +373,13 @@ void MainWindow::updateODataLabel(const std::vector<ToolData>& tools)
 				F_text = "<b style='color: #dc3545;'>Fusion: Calibration files error!</b>";
 			}
 			else {
-				const ToolData& data_M = M_data[0];
-				const Transform& transform_M = data_M.transform;      //包含实时EMsensor_2Aurora (q0,qx,qy,qz,tx,ty,tz)
-				const ToolData& data_O2 = O_data[1];
-				const Transform& transform_O2 = data_O2.transform;    //包含实时Marker2_2Vega (q0,qx,qy,qz,tx,ty,tz)
+				const ToolData& data_Mtool = M_data[0];
+				const Transform& transform_Mtool = data_Mtool.transform;      //包含实时EMsensor_2Aurora (q0,qx,qy,qz,tx,ty,tz)
+				const ToolData& data_Otool3 = O_data[2];
+				const Transform& transform_Otool3 = data_Otool3.transform;    //包含实时Marker2_2Vega (q0,qx,qy,qz,tx,ty,tz)
 
-				cv::Mat EMsensor_2Aurora = transformToMatrix(transform_M);
-				cv::Mat Marker2_2Vega = transformToMatrix(transform_O2);
+				cv::Mat EMsensor_2Aurora = transformToMatrix(transform_Mtool);
+				cv::Mat Marker2_2Vega = transformToMatrix(transform_Otool3);
 
 				// 检查生成的变换矩阵是否有效
 				if (EMsensor_2Aurora.empty() || Marker2_2Vega.empty()) {
@@ -357,21 +391,19 @@ void MainWindow::updateODataLabel(const std::vector<ToolData>& tools)
 					double q0, qx, qy, qz, tx, ty, tz;
 					matrixToTransform(output_Marker1_2Vega, q0, qx, qy, qz, tx, ty, tz);
 
-					F_text = QString(
-						"<div style='padding: 5px; border-left: 4px solid #007bff;'>"
-						"<b style='color: #007bff;'>FUSION DATA</b><br/>"
-						"<table cellspacing='0' cellpadding='2' style='font-family: Consolas, monospace; font-size: 13px;'>"
-						"<tr><td><b>Pos:</b></td><td>X:%1, Y:%2, Z:%3 mm</td></tr>"
-						"<tr><td><b>Rot:</b></td><td>q0:%4, qx:%5, qy:%6, qz:%7</td></tr>"
-						"</table>"
-						"</div>")
-						.arg(tx, 8, 'f', 2)
-						.arg(ty, 8, 'f', 2)
-						.arg(tz, 8, 'f', 2)
-						.arg(q0, 8, 'f', 4)
-						.arg(qx, 8, 'f', 4)
-						.arg(qy, 8, 'f', 4)
-						.arg(qz, 8, 'f', 4);
+					F_text = fusionHeader + QString(
+						"<div style='border-left: 5px solid #007bff; padding-left: 8px;'>"
+						"<b style='color:#007bff;'>FUSION</b> "
+						"<span style='font-family:Consolas; font-size:16px; font-weight:normal;'>"
+						"X:%1, Y:%2, Z:%3 mm | Rot: q0:%4, qx:%5, qy:%6, qz:%7"
+						"</span></div>")
+						.arg(tx, 7, 'f', 2)
+						.arg(ty, 7, 'f', 2)
+						.arg(tz, 7, 'f', 2)
+						.arg(q0, 7, 'f', 4)
+						.arg(qx, 7, 'f', 4)
+						.arg(qy, 7, 'f', 4)
+						.arg(qz, 7, 'f', 4);
 
 					if (displayWidget) {
 						vtkSmartPointer<vtkTransform> ndiTransform = vtkSmartPointer<vtkTransform>::New();
@@ -425,32 +457,42 @@ void MainWindow::updateMDataLabel(const std::vector<ToolData>& tools) {
 		m_recordingDialog->addMData(tools);
 	}
 
-	QString text = "<div style='font-family: Segoe UI, sans-serif;'>";
+	if (m_calibrationDialog) {
+		m_calibrationDialog->addMData(tools);
+	}
+
+	QString header = QString("<div style='font-size: 18px; font-weight: bold; color: #495057; margin-bottom: 10px;'>%1</div>")
+		.arg(QString::fromLocal8Bit("电磁数据"));
+
+	QString text = header + "<div style='font-family: Segoe UI, sans-serif;'>";
 	for (size_t i = 0; i < tools.size(); ++i) {
 		const ToolData& data = tools[i];
 		const Transform& transform = data.transform;
 		QString statusColor = transform.isMissing() ? "#dc3545" : "#17a2b8"; // 电磁用青蓝色区分
 		QString statusText = transform.isMissing() ? "Missing" : "Normal";
 
+		QString dataText = "";
+		if (!transform.isMissing()) {
+			dataText = QString("X:%1, Y:%2, Z:%3 mm | Rot: q0:%4, qx:%5, qy:%6, qz:%7")
+				.arg(transform.tx, 7, 'f', 2)
+				.arg(transform.ty, 7, 'f', 2)
+				.arg(transform.tz, 7, 'f', 2)
+				.arg(transform.q0, 7, 'f', 4)
+				.arg(transform.qx, 7, 'f', 4)
+				.arg(transform.qy, 7, 'f', 4)
+				.arg(transform.qz, 7, 'f', 4);
+		}
+
 		text += QString(
-			"<div style='margin-bottom: 10px; padding: 5px; border-left: 4px solid %1;'>"
-			"<b>MAGNETIC TOOL %2</b> <span style='color: %1; font-weight: bold;'>[%3]</span><br/>"
-			"<table cellspacing='0' cellpadding='2' style='font-family: Consolas, monospace; font-size: 13px;'>"
-			"<tr><td><b>Pos:</b></td><td>X:%4, Y:%5, Z:%6 mm</td></tr>"
-			"<tr><td><b>Rot:</b></td><td>q0:%7, qx:%8, qy:%9, qz:%10</td></tr>"
-			"</table>"
+			"<div style='margin-bottom: 15px; border-left: 5px solid %1; padding-left: 8px;'>"
+			"<b>M%2</b> <span style='color:%1; font-weight:bold;'>[%3]</span> "
+			"<span style='font-family:Consolas; font-size:16px; font-weight:normal;'>%4</span>"
 			"</div>"
 		)
 		.arg(statusColor)
 		.arg(i + 1)
 		.arg(statusText)
-		.arg(transform.tx, 8, 'f', 2)
-		.arg(transform.ty, 8, 'f', 2)
-		.arg(transform.tz, 8, 'f', 2)
-		.arg(transform.q0, 8, 'f', 4)
-		.arg(transform.qx, 8, 'f', 4)
-		.arg(transform.qy, 8, 'f', 4)
-		.arg(transform.qz, 8, 'f', 4);
+		.arg(dataText);
 	}
 	text += "</div>";
 	ui->m_MdataLabel->setText(text);
