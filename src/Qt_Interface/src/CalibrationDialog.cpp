@@ -65,6 +65,7 @@ void CalibrationDialog::onStartButtonClicked()
 	headerWritten = false;
 
 	ui->groupSpinBox->setEnabled(false);
+	ui->iterSpinBox->setEnabled(false);
 	ui->startButton->setEnabled(false);
 	ui->recordButton->setEnabled(true);
 	
@@ -104,6 +105,10 @@ void CalibrationDialog::StaticCalibrateCollection()
 	m_lastOData.clear();
 	m_lastMData.clear();
 
+	// 局部缓存本组的数据行，确保只有在采集完整且合格时才写入文件
+	std::vector<std::string> groupLines1;
+	std::vector<std::string> groupLines2;
+
 	while (linesWritten < linesPerGroup && waitCycles < maxWaitCycles)
 	{
 		QApplication::processEvents();
@@ -126,6 +131,16 @@ void CalibrationDialog::StaticCalibrateCollection()
 		if (!allValid) {
 			waitCycles++;
 			continue; 
+		}
+
+		// --- 新增：误差验证逻辑 ---
+		double emError = enabledTools2[0].transform.error;
+		if (emError > 0.2) {
+			ui->label->setText(QString::fromLocal8Bit("<font color='red'><b>采集异常：</b>电磁工具误差过大 (%1 > 0.2)！<br/>请确保工具可见且保持静止，点击“单组采集”重试第 %2 组。</font>")
+				.arg(emError)
+				.arg(currentGroupIndex + 1));
+			ui->recordButton->setEnabled(true);
+			return; // 终止当前组采集，文件不写入，进度不增加
 		}
 
 		// 写 CSV 表头 (全局只写一次)
@@ -152,18 +167,19 @@ void CalibrationDialog::StaticCalibrateCollection()
 			headerWritten = true;
 		}
 
-		// 写数据行
-		csvFile1 << enabledTools1.size();
+		// 将数据行构造为字符串并存入局部缓存
+		std::stringstream ss1, ss2;
+		ss1 << enabledTools1.size();
 		for (int t = 0; t < (int)enabledTools1.size(); t++) {
-			csvFile1 << "," << enabledTools1[t].toolInfo << "," << toolDataToCSV(enabledTools1[t]);
+			ss1 << "," << enabledTools1[t].toolInfo << "," << toolDataToCSV(enabledTools1[t]);
 		}
-		csvFile1 << std::endl;
+		groupLines1.push_back(ss1.str());
 
-		csvFile2 << enabledTools2.size();
+		ss2 << enabledTools2.size();
 		for (int t = 0; t < (int)enabledTools2.size(); t++) {
-			csvFile2 << "," << enabledTools2[t].toolInfo << "," << toolDataToCSV(enabledTools2[t]);
+			ss2 << "," << enabledTools2[t].toolInfo << "," << toolDataToCSV(enabledTools2[t]);
 		}
-		csvFile2 << std::endl;
+		groupLines2.push_back(ss2.str());
 
 		linesWritten++;
 		waitCycles = 0; 
@@ -176,6 +192,10 @@ void CalibrationDialog::StaticCalibrateCollection()
 		ui->recordButton->setEnabled(true);
 		return;
 	}
+
+	// 采集成功：将缓存的 10 行数据写入文件
+	for (const auto& line : groupLines1) csvFile1 << line << std::endl;
+	for (const auto& line : groupLines2) csvFile2 << line << std::endl;
 
 	csvFile1.flush();
 	csvFile2.flush();
@@ -239,67 +259,152 @@ std::string CalibrationDialog::toolDataToCSV(const ToolData& toolData)
 }
 
 void CalibrationDialog::Calibrationcalculate() {
-	//调用OMCalibrate中的方法实现采集数据的处理和初步计算标定矩阵
 	OMCalibrate OMC;
 
 	ui->label->setText(QString::fromLocal8Bit("正在计算标定矩阵..."));
 	ui->calculateButton->setEnabled(false);
-	QApplication::processEvents(); // 刷新UI显示
+	QApplication::processEvents();
 
-	// 传入保存路径，加载数据
+	// 1. 初始加载数据
 	OMC.LoadData(m_savePath.toStdString(), totalGroups);
 
-	// 执行标定计算
-	OMC.HandeyeCalibrate3();
+	int maxIterations = ui->iterSpinBox->value();
+	std::vector<CalibrationError> iterationErrors;
+	std::vector<cv::Mat> m12ems_history;
+	std::vector<cv::Mat> em2m2_history;
 	
-	// 检查标定结果是否有效
-	if (OMC.Marker1_2EMsensor.empty() || OMC.EM_2Marker2.empty()) {
-		ui->label->setText(QString::fromLocal8Bit("<font color='red'>计算失败: 采集数据无法解算有效矩阵，请重新采集</font>"));
-		ui->calculateButton->setEnabled(true);
-		return;
+	// 追踪原始索引
+	std::vector<int> activeGroupIds;
+	for (int i = 0; i < (int)OMC.M1_data.size(); ++i) activeGroupIds.push_back(i + 1);
+	std::vector<std::vector<int>> iterationGroupIdsHistory; // 记录每次迭代剩下的 ID
+	std::vector<int> removedIds;
+
+	// 2. 迭代优化循环
+	for (int iter = 0; iter <= maxIterations; ++iter) {
+		iterationGroupIdsHistory.push_back(activeGroupIds);
+
+		// 执行当前数据集的标定
+		OMC.HandeyeCalibrate3();
+
+		if (OMC.Marker1_2EMsensor.empty() || OMC.EM_2Marker2.empty()) {
+			ui->label->setText(QString::fromLocal8Bit("<font color='red'>计算失败: 数据不足或解算异常</font>"));
+			ui->calculateButton->setEnabled(true);
+			return;
+		}
+
+		// 评估当前标定结果
+		CalibrationError currentError = OMC.EvaluateCalibration();
+		iterationErrors.push_back(currentError);
+		m12ems_history.push_back(OMC.Marker1_2EMsensor.clone());
+		em2m2_history.push_back(OMC.EM_2Marker2.clone());
+
+		// 如果不是最后一次迭代，且还有足够的数据，则剔除误差最大的一组
+		if (iter < maxIterations && currentError.translationErrors.size() > 3) {
+			auto maxIt = std::max_element(currentError.translationErrors.begin(), currentError.translationErrors.end());
+			int maxIdx = std::distance(currentError.translationErrors.begin(), maxIt);
+			
+			removedIds.push_back(activeGroupIds[maxIdx]); // 记录被剔除的原始 ID
+			activeGroupIds.erase(activeGroupIds.begin() + maxIdx); // 从当前活跃 ID 中移除
+			OMC.RemoveGroup(maxIdx);
+		} else {
+			break; 
+		}
 	}
 
-	// 评估标定结果
-	CalibrationError error = OMC.EvaluateCalibration();
-
-	// 保存评估结果到文件
+	// 3. 保存详细结果报告 (包含迭代前后对比)
 	QString resultPath = m_savePath + "/CalibrationResult.txt";
 	std::ofstream file(resultPath.toStdString());
 	if (file.is_open()) {
-		file << "=== Calibration Matrices ===\n\n";
+		file << "==========================================================\n";
+		file << "            Iterative Calibration Detailed Report\n";
+		file << "==========================================================\n\n";
+
+		// A. 概览
+		file << "Summary:\n";
+		file << "Initial Avg Translation Error: " << iterationErrors.front().avgTranslationError << " mm\n";
+		file << "Final Avg Translation Error:   " << iterationErrors.back().avgTranslationError << " mm\n";
+		file << "Total Iterations Executed:     " << iterationErrors.size() - 1 << "\n";
+		file << "Removed Groups (Original IDs): ";
+		if (removedIds.empty()) file << "None";
+		else for (int id : removedIds) file << id << " ";
+		file << "\n\n";
+
+		// 新增：迭代过程历史（列出中间每一步的平均误差）
+		file << "Iteration Process History:\n";
+		file << "Iter | AvgTransErr(mm) | AvgRotErr(deg) | RemainingGroups\n";
+		file << "--------------------------------------------------------\n";
+		for (size_t i = 0; i < iterationErrors.size(); ++i) {
+			file << std::setw(4) << std::left << i << " | "
+				 << std::setw(15) << std::fixed << std::setprecision(6) << iterationErrors[i].avgTranslationError << " | "
+				 << std::setw(14) << iterationErrors[i].avgRotationError << " | "
+				 << iterationErrors[i].translationErrors.size() << "\n";
+		}
+		file << "\n";
+
+		// B. 初始与最终的详细误差对比
+		auto writeDetailedErrors = [&](int iterIdx, const std::string& title) {
+			file << ">>> " << title << "\n";
+			const auto& errs = iterationErrors[iterIdx];
+			const auto& ids = iterationGroupIdsHistory[iterIdx];
+			file << "GroupID | TranslationErr(mm) | RotationErr(deg)\n";
+			file << "-----------------------------------------------\n";
+			for (size_t i = 0; i < errs.translationErrors.size(); ++i) {
+				file << std::setw(7) << std::left << ids[i] << " | " 
+					 << std::setw(18) << std::fixed << std::setprecision(6) << errs.translationErrors[i] << " | "
+					 << errs.rotationErrors[i] << "\n";
+			}
+			file << "\n";
+		};
+
+		writeDetailedErrors(0, "Initial Detailed Errors (Iteration 0)");
+		if (iterationErrors.size() > 1) {
+			writeDetailedErrors(iterationErrors.size() - 1, "Final Detailed Errors (Optimized)");
+		}
+
+		// C. 最终矩阵
+		file << ">>> Final Calibration Matrices:\n\n";
 		file << "Marker1_2EMsensor:\n";
-		for (int i = 0; i < 4; i++) {
-			for (int j = 0; j < 4; j++) file << OMC.Marker1_2EMsensor.at<double>(i, j) << " ";
+		for (int r = 0; r < 4; r++) {
+			for (int c = 0; c < 4; c++) file << std::setw(12) << m12ems_history.back().at<double>(r, c) << " ";
 			file << "\n";
 		}
 		file << "\nEM_2Marker2:\n";
-		for (int i = 0; i < 4; i++) {
-			for (int j = 0; j < 4; j++) file << OMC.EM_2Marker2.at<double>(i, j) << " ";
+		for (int r = 0; r < 4; r++) {
+			for (int c = 0; c < 4; c++) file << std::setw(12) << em2m2_history.back().at<double>(r, c) << " ";
 			file << "\n";
-		}
-		file << "\n=== Evaluation Results ===\n\n";
-		file << "Average Translation Error: " << error.avgTranslationError << " mm\n";
-		file << "Average Rotation Error: " << error.avgRotationError << " degrees\n";
-		file << "\nDetailed Errors per Group:\n";
-		for (size_t i = 0; i < error.translationErrors.size(); i++) {
-			file << "Group " << i + 1 << ": Translation Error = " << error.translationErrors[i] 
-				 << " mm, Rotation Error = " << error.rotationErrors[i] << " degrees\n";
 		}
 		file.close();
 	}
 
-	// 同时保存原始格式的矩阵文件供主界面加载
+	// 4. 更新最终矩阵文件供主界面加载
 	saveMatToTxt(OMC.Marker1_2EMsensor, "Marker1_2EMsensor.txt");
 	saveMatToTxt(OMC.EM_2Marker2, "EM_2Marker2.txt");
 
-	// 弹出结果窗口
-	QString msg = QString::fromLocal8Bit("标定计算完成！\n\n平均平移误差: %1 mm\n平均旋转误差: %2 度\n\n结果已保存至: %3")
-		.arg(error.avgTranslationError, 0, 'f', 4)
-		.arg(error.avgRotationError, 0, 'f', 4)
-		.arg(resultPath);
-	QMessageBox::information(this, QString::fromLocal8Bit("标定评估结果"), msg);
+	// 5. 弹出结果反馈
+	const CalibrationError& initial = iterationErrors.front();
+	const CalibrationError& final = iterationErrors.back();
+	
+	QString removedStr = "None";
+	if (!removedIds.empty()) {
+		QStringList list;
+		for(int id : removedIds) list << QString::number(id);
+		removedStr = list.join(", ");
+	}
 
-	ui->label->setText(QString::fromLocal8Bit("<font color='green'><b>计算完成并已评估！</b></font><br/>结果已保存到 CalibrationResult.txt"));
+	QString msg = QString::fromLocal8Bit("标定优化完成！\n\n"
+		"初始误差: %1 mm / %2 度\n"
+		"最终误差: %3 mm / %4 度\n"
+		"剔除组号: %5\n\n"
+		"详细报告已存至: CalibrationResult.txt")
+		.arg(initial.avgTranslationError, 0, 'f', 4)
+		.arg(initial.avgRotationError, 0, 'f', 4)
+		.arg(final.avgTranslationError, 0, 'f', 4)
+		.arg(final.avgRotationError, 0, 'f', 4)
+		.arg(removedStr);
+
+	QMessageBox::information(this, QString::fromLocal8Bit("标定优化结果"), msg);
+
+	ui->label->setText(QString::fromLocal8Bit("<font color='green'><b>优化计算完成！</b></font><br/>最终平均误差: %1 mm").arg(final.avgTranslationError));
 	ui->calculateButton->setEnabled(true);
 }
 

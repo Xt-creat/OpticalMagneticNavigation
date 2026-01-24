@@ -2,6 +2,7 @@
 #include <Eigen/Dense>
 #include <Eigen/Geometry>
 #include <numeric>
+#include <algorithm>
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
@@ -20,22 +21,6 @@ OMCalibrate::~OMCalibrate()
 {
 }
 
-// 辅助函数：根据列名定位索引
-static int findColumnIndex(const std::string& header, const std::string& columnName, int occurrence = 1) {
-	std::stringstream ss(header);
-	std::string cell;
-	int index = 0;
-	int foundCount = 0;
-	while (std::getline(ss, cell, ',')) {
-		if (cell == columnName) {
-			foundCount++;
-			if (foundCount == occurrence) return index;
-		}
-		index++;
-	}
-	return -1;
-}
-
 void OMCalibrate::LoadData(const std::string& path, int group)
 {
 	std::string filename1 = path + "/Vega.csv";
@@ -45,19 +30,38 @@ void OMCalibrate::LoadData(const std::string& path, int group)
 	M2_data.clear();
 	EMSensor_data.clear();
 
-	// 自动定位列索引：
-	// M1 对应 Vega 的第一个工具 (Port:1)
-	// M2 对应 Vega 的第三个工具 (Port:3)
-	// EMSensor 对应 Aurora 的第一个工具 (Port:1)
-	
-	ReadRecordData(this->M1_data, filename1, group, 10, 9);   // Tool 0 的 Q0
+	ReadRecordData(this->M1_data, filename1, group, 10, 9);
 	Quat2Matrices(M1_data);
 
-	ReadRecordData(this->M2_data, filename1, group, 10, 73);  // Tool 2 的 Q0 (Port:3)
+	ReadRecordData(this->M2_data, filename1, group, 10, 73);
 	Quat2Matrices(M2_data);
 
 	ReadRecordData(this->EMSensor_data, filename2, group, 10, 9);
 	Quat2Matrices(EMSensor_data);
+
+	saveTrackedDataToCsv(M1_data, path + "/Processed_M1.csv");
+	saveTrackedDataToCsv(M2_data, path + "/Processed_M2.csv");
+	saveTrackedDataToCsv(EMSensor_data, path + "/Processed_EMSensor.csv");
+
+	PrepareCalibration();
+
+	// 保存中间变换矩阵到 txt 文件
+	saveVectorMatToTxt(Marker1_2Vega, path + "/Marker1_2Vega.txt");
+	saveVectorMatToTxt(Marker2_2Vega, path + "/Marker2_2Vega.txt");
+	saveVectorMatToTxt(EMsensor_2Aurora, path + "/EMsensor_2Aurora.txt");
+	saveVectorMatToTxt(Aurora_2EMsensor, path + "/Aurora_2EMsensor.txt");
+	saveVectorMatToTxt(Marker2_2Marker1, path + "/Marker2_2Marker1.txt");
+	saveVectorMatToTxt(Marker1_2Marker2, path + "/Marker1_2Marker2.txt");
+}
+
+void OMCalibrate::PrepareCalibration()
+{
+	R_Marker1_2Vega.clear();
+	t_Marker1_2Vega.clear();
+	R_Marker2_2Vega.clear();
+	t_Marker2_2Vega.clear();
+	R_EMsensor_2Aurora.clear();
+	t_EMsensor_2Aurora.clear();
 
 	GetRt();
 
@@ -111,6 +115,20 @@ void OMCalibrate::LoadData(const std::string& path, int group)
 			Marker1_2Marker2.push_back(Rt2);
 		}
 	}
+}
+
+void OMCalibrate::RemoveGroup(int index)
+{
+	if (index >= 0 && index < (int)M1_data.size()) {
+		M1_data.erase(M1_data.begin() + index);
+	}
+	if (index >= 0 && index < (int)M2_data.size()) {
+		M2_data.erase(M2_data.begin() + index);
+	}
+	if (index >= 0 && index < (int)EMSensor_data.size()) {
+		EMSensor_data.erase(EMSensor_data.begin() + index);
+	}
+	PrepareCalibration();
 }
 
 static double rotationMatrixToAngleError(const cv::Mat& rotationMatrix) {
@@ -206,26 +224,48 @@ void OMCalibrate::ReadRecordData(std::vector<TrackedData>& m_data,const std::str
 	for (int i = 0; i < 2; ++i) std::getline(file, line); // 跳过表头
 
 	int dataCount = 0;
-	while (dataCount < groups && std::getline(file, line)) {
-		std::stringstream ss(line);
-		std::string cell;
-		TrackedData data;
-		int column = 0;
-		bool valid = false;
-
-		while (std::getline(ss, cell, ',')) {
-			if (column == start - 2) { // 检查 TransformStatus
-				if (cell != "Enabled" && cell != "OK") break; 
-				valid = true;
+	while (dataCount < groups) {
+		std::vector<TrackedData> groupRawData;
+		for (int i = 0; i < interval; ++i) {
+			if (!std::getline(file, line)) break;
+			std::stringstream ss(line);
+			std::string cell;
+			TrackedData data;
+			int column = 0;
+			bool valid = false;
+			while (std::getline(ss, cell, ',')) {
+				if (column == start - 2) { if (cell == "Enabled" || cell == "OK") valid = true; else break; }
+				try {
+					if (column >= start-1 && column < start+3) data.quat[column - start+1] = std::stod(cell);
+					else if (column >= start + 3 && column < start+6) data.t[column - start - 3] = std::stod(cell);
+				} catch (...) { valid = false; break; }
+				column++;
 			}
-			if (column >= start-1 && column < start+3) data.quat[column - start+1] = std::stod(cell);
-			else if (column >= start + 3 && column < start+6) data.t[column -start - 3] = std::stod(cell);
-			column++;
+			if (valid) groupRawData.push_back(data);
 		}
-		if (valid) m_data.push_back(data);
-
-		for (int i = 0; i < interval-1; ++i) std::getline(file, line);
-		++dataCount;
+		if (groupRawData.size() < 6) { dataCount++; continue; }
+		double cX = 0, cY = 0, cZ = 0;
+		for (const auto& d : groupRawData) { cX += d.t[0]; cY += d.t[1]; cZ += d.t[2]; }
+		cX /= groupRawData.size(); cY /= groupRawData.size(); cZ /= groupRawData.size();
+		struct IndexedError { int index; double dist; };
+		std::vector<IndexedError> errors;
+		for (int i = 0; i < (int)groupRawData.size(); ++i) {
+			double dx = groupRawData[i].t[0] - cX, dy = groupRawData[i].t[1] - cY, dz = groupRawData[i].t[2] - cZ;
+			errors.push_back({ i, std::sqrt(dx*dx + dy*dy + dz*dz) });
+		}
+		std::sort(errors.begin(), errors.end(), [](const IndexedError& a, const IndexedError& b) { return a.dist < b.dist; });
+		int keepCount = 6;
+		double sumQ[4] = {0}, sumT[3] = {0};
+		for (int i = 0; i < keepCount; ++i) {
+			int idx = errors[i].index;
+			for (int j = 0; j < 4; j++) sumQ[j] += groupRawData[idx].quat[j];
+			for (int j = 0; j < 3; j++) sumT[j] += groupRawData[idx].t[j];
+		}
+		TrackedData avgData;
+		for (int j = 0; j < 4; j++) avgData.quat[j] = sumQ[j] / keepCount;
+		for (int j = 0; j < 3; j++) avgData.t[j] = sumT[j] / keepCount;
+		m_data.push_back(avgData);
+		dataCount++;
 	}
 }
 
@@ -254,5 +294,38 @@ cv::Mat OMCalibrate::createTransformationMatrix(const cv::Mat& R, const cv::Mat&
 	return M;
 }
 
-void OMCalibrate::saveVectorMatToTxt(const std::vector<cv::Mat>& matrices, const std::string& filename) { /* ... 保持不变 ... */ }
-void OMCalibrate::PrintTrackedData(const std::vector<TrackedData>& m_data) { /* ... 保持不变 ... */ }
+void OMCalibrate::saveTrackedDataToCsv(const std::vector<TrackedData>& data, const std::string& filename) {
+	std::ofstream file(filename);
+	if (!file.is_open()) return;
+	file << "Group,Q0,Qx,Qy,Qz,Tx,Ty,Tz\n";
+	for (size_t i = 0; i < data.size(); ++i) {
+		file << i + 1 << "," << data[i].quat[0] << "," << data[i].quat[1] << "," << data[i].quat[2] << "," << data[i].quat[3] << ","
+			<< data[i].t[0] << "," << data[i].t[1] << "," << data[i].t[2] << "\n";
+	}
+	file.close();
+}
+
+void OMCalibrate::saveVectorMatToTxt(const std::vector<cv::Mat>& matrices, const std::string& filename) {
+	std::ofstream file(filename);
+	if (!file.is_open()) return;
+	for (size_t i = 0; i < matrices.size(); ++i) {
+		file << "Matrix " << i + 1 << " (" << matrices[i].rows << "x" << matrices[i].cols << "):\n";
+		for (int r = 0; r < matrices[i].rows; ++r) {
+			for (int c = 0; c < matrices[i].cols; ++c) file << matrices[i].at<double>(r, c) << " ";
+			file << "\n";
+		}
+		file << "\n";
+	}
+	file.close();
+}
+
+void OMCalibrate::PrintTrackedData(const std::vector<TrackedData>& m_data) {
+	for (const auto& d : m_data) {
+		std::cout << "Quaternion: " << d.quat[0] << " " << d.quat[1] << " " << d.quat[2] << " " << d.quat[3] << "\n";
+		std::cout << "Translation: " << d.t[0] << " " << d.t[1] << " " << d.t[2] << "\n-----------------------------\n";
+	}
+}
+
+void OMCalibrate::HandeyeCalibrate() { /* ... 不再使用，保留定义 ... */ }
+void OMCalibrate::HandeyeCalibrate1() { /* ... 不再使用，保留定义 ... */ }
+void OMCalibrate::HandeyeCalibrate2() { /* ... 不再使用，保留定义 ... */ }

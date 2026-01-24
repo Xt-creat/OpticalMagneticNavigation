@@ -45,6 +45,10 @@ public:
 
 	void LoadData(const std::string& path, int group = 30);
 
+	void PrepareCalibration();
+
+	void RemoveGroup(int index);
+
 	void HandeyeCalibrate();  //求解两次AX=XB，计算M12EMS和EM2M2
 
 	void HandeyeCalibrate1();
@@ -56,6 +60,8 @@ public:
 	void PrintTrackedData(const std::vector<TrackedData>& m_data);
 
 	void saveVectorMatToTxt(const std::vector<cv::Mat>& matrices, const std::string& filename);
+
+	void saveTrackedDataToCsv(const std::vector<TrackedData>& data, const std::string& filename);
 
 	CalibrationError EvaluateCalibration();
 
