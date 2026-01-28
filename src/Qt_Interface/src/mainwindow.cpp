@@ -194,7 +194,7 @@ void MainWindow::startTrackingThreads()
 	}
 
 	deviceReader1 = new DeviceReader(1, 100); 
-	deviceReader2 = new DeviceReader(2, 50); 
+	deviceReader2 = new DeviceReader(2, 100); 
 	
 	thread1 = new QThread(this);
 	deviceReader1->moveToThread(thread1);
