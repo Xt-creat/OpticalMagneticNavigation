@@ -241,7 +241,7 @@
        </spacer>
       </item>
       <item>
-       <widget class="QPushButton" name="m_StopBtn">
+       <widget class="QPushButton" name="m_record">
         <property name="enabled">
          <bool>true</bool>
         </property>

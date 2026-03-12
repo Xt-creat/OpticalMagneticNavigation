@@ -82,18 +82,17 @@ MainWindow::MainWindow(QWidget *parent) :
 	ui->m_TrackingBtn->setCheckable(true);
 	connect(ui->m_TrackingBtn, &QPushButton::clicked, this, &MainWindow::OnStartTracking);
 	
-	connect(ui->m_StopBtn, &QPushButton::clicked, this, &MainWindow::OnStopTracking);
-	ui->m_StopBtn->setText("Record Data");
+	connect(ui->m_record, &QPushButton::clicked, this, &MainWindow::OnStopTracking);
 
 	connect(ui->m_DisplayBtn, &QPushButton::clicked, this, &MainWindow::onDisplayBtnClicked);
 
 	ui->m_DisplaySavePathLineEdit->setEnabled(false);
 
-	// Sampling frequency config: 10-30 Hz, default 10 Hz
-	ui->m_SleepSpinBox->setRange(10, 30);
-	ui->m_SleepSpinBox->setValue(10);
+	// Sampling frequency config: 10-60 Hz, default 25 Hz
+	ui->m_SleepSpinBox->setRange(10, 60);
+	ui->m_SleepSpinBox->setValue(25);
 	ui->m_SleepSpinBox->setSuffix(" Hz");
-	ui->m_SleepSpinBox->setToolTip("Sampling frequency (10-30 Hz)");
+	ui->m_SleepSpinBox->setToolTip("Sampling frequency (10-60 Hz)");
 	
 }
 
@@ -142,13 +141,14 @@ void MainWindow::OnStartBtnClicked()
 	}
 
 	if (!m_calibrationDialog) {
-		m_calibrationDialog = new CalibrationDialog(m_savePath, this);
+		m_calibrationDialog = new CalibrationDialog(m_savePath, ui->m_SleepSpinBox->value(), this);
 		m_calibrationDialog->setAttribute(Qt::WA_DeleteOnClose);
 		connect(m_calibrationDialog, &QObject::destroyed, [this]() {
 			m_calibrationDialog = nullptr;
 		});
 		m_calibrationDialog->show();
 	}
+	m_calibrationDialog->setSampleFrequencyHz(ui->m_SleepSpinBox->value());
 	m_calibrationDialog->raise();
 	m_calibrationDialog->activateWindow();
 }

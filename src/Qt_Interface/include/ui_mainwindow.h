@@ -47,7 +47,7 @@ public:
     QSpacerItem *horizontalSpacer_6;
     QPushButton *m_TrackingBtn;
     QSpacerItem *horizontalSpacer_4;
-    QPushButton *m_StopBtn;
+    QPushButton *m_record;
     QSpacerItem *horizontalSpacer_5;
     QPushButton *m_DisplayBtn;
     QSpacerItem *horizontalSpacer_3;
@@ -177,13 +177,13 @@ public:
 
         horizontalLayout_2->addItem(horizontalSpacer_4);
 
-        m_StopBtn = new QPushButton(centralWidget);
-        m_StopBtn->setObjectName(QString::fromUtf8("m_StopBtn"));
-        m_StopBtn->setEnabled(true);
-        m_StopBtn->setMinimumSize(QSize(160, 40));
-        m_StopBtn->setMaximumSize(QSize(160, 40));
+        m_record = new QPushButton(centralWidget);
+        m_record->setObjectName(QString::fromUtf8("m_record"));
+        m_record->setEnabled(true);
+        m_record->setMinimumSize(QSize(160, 40));
+        m_record->setMaximumSize(QSize(160, 40));
 
-        horizontalLayout_2->addWidget(m_StopBtn);
+        horizontalLayout_2->addWidget(m_record);
 
         horizontalSpacer_5 = new QSpacerItem(40, 20, QSizePolicy::Expanding, QSizePolicy::Minimum);
 
@@ -229,7 +229,7 @@ public:
 #ifndef QT_NO_SHORTCUT
         m_TrackingBtn->setShortcut(QApplication::translate("MainWindow", "Space", nullptr));
 #endif // QT_NO_SHORTCUT
-        m_StopBtn->setText(QApplication::translate("MainWindow", "\345\201\234\346\255\242", nullptr));
+        m_record->setText(QApplication::translate("MainWindow", "\346\225\260\346\215\256\350\256\260\345\275\225", nullptr));
         m_DisplayBtn->setText(QApplication::translate("MainWindow", "\346\230\276\347\244\272", nullptr));
     } // retranslateUi
 

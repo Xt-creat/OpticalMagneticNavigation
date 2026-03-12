@@ -26,7 +26,7 @@ TrackingRecordingDialog::~TrackingRecordingDialog()
 void TrackingRecordingDialog::onStartRecording()
 {
     if (m_savePath.isEmpty()) {
-        ui->m_statusLabel->setText(QString::fromLocal8Bit("错误: 未指定保存路径！"));
+        ui->m_statusLabel->setText(tr("Error: No save path specified!"));
         return;
     }
 
@@ -39,18 +39,22 @@ void TrackingRecordingDialog::onStartRecording()
     m_magneticFile.open(magneticPath.toStdString(), std::ios::out);
 
     if (m_opticalFile.is_open() && m_magneticFile.is_open()) {
-        m_headerWrittenO = false; // 重置标志位
+        m_headerWrittenO = false; 
         m_headerWrittenM = false;
+        m_hasPendingOData = false;
+        m_hasPendingMData = false;
+        m_pendingOData.clear();
+        m_pendingMData.clear();
 
         m_isRecording = true;
         m_recordStartTime = QDateTime::currentDateTime();
         ui->m_startBtn->setEnabled(false);
         ui->m_stopBtn->setEnabled(true);
         m_timer->start(1000);
-        ui->m_statusLabel->setText(QString::fromLocal8Bit("状态: 正在记录 (第 %1 次)").arg(m_recordCount));
+        ui->m_statusLabel->setText(tr("Status: Recording (Session %1)").arg(m_recordCount));
         ui->m_timeLabel->setText("00:00:00");
     } else {
-        ui->m_statusLabel->setText(QString::fromLocal8Bit("错误: 无法创建文件！"));
+        ui->m_statusLabel->setText(tr("Error: Cannot create files!"));
     }
 }
 
@@ -70,7 +74,7 @@ void TrackingRecordingDialog::onStopRecording()
         
         ui->m_startBtn->setEnabled(true);
         ui->m_stopBtn->setEnabled(false);
-        ui->m_statusLabel->setText(QString::fromLocal8Bit("状态: 已停止，数据已保存"));
+        ui->m_statusLabel->setText(tr("Status: Stopped, data saved"));
     }
 }
 
@@ -88,24 +92,46 @@ void TrackingRecordingDialog::onUpdateTime()
 
 void TrackingRecordingDialog::addOData(const std::vector<ToolData>& tools)
 {
-    if (m_isRecording && m_opticalFile.is_open()) {
-        if (!m_headerWrittenO && !tools.empty()) {
-            writeHeader(m_opticalFile, tools);
-            m_headerWrittenO = true;
-        }
-        writeToolDataToCSV(m_opticalFile, tools);
-    }
+    if (!m_isRecording || !m_opticalFile.is_open() || tools.empty()) return;
+
+    m_pendingOData = tools;
+    m_hasPendingOData = true;
+    tryWriteSynchronizedRows();
 }
 
 void TrackingRecordingDialog::addMData(const std::vector<ToolData>& tools)
 {
-    if (m_isRecording && m_magneticFile.is_open()) {
-        if (!m_headerWrittenM && !tools.empty()) {
-            writeHeader(m_magneticFile, tools);
-            m_headerWrittenM = true;
-        }
-        writeToolDataToCSV(m_magneticFile, tools);
+    if (!m_isRecording || !m_magneticFile.is_open() || tools.empty()) return;
+
+    m_pendingMData = tools;
+    m_hasPendingMData = true;
+    tryWriteSynchronizedRows();
+}
+
+void TrackingRecordingDialog::tryWriteSynchronizedRows()
+{
+    if (!m_isRecording || !m_opticalFile.is_open() || !m_magneticFile.is_open()) return;
+    if (!m_hasPendingOData || !m_hasPendingMData) return;
+
+    if (!m_headerWrittenO && !m_pendingOData.empty()) {
+        writeHeader(m_opticalFile, m_pendingOData);
+        m_headerWrittenO = true;
     }
+    if (!m_headerWrittenM && !m_pendingMData.empty()) {
+        writeHeader(m_magneticFile, m_pendingMData);
+        m_headerWrittenM = true;
+    }
+
+    writeToolDataToCSV(m_opticalFile, m_pendingOData);
+    writeToolDataToCSV(m_magneticFile, m_pendingMData);
+
+    m_hasPendingOData = false;
+    m_hasPendingMData = false;
+}
+
+uint32_t TrackingRecordingDialog::extractFrameNumber(const std::vector<ToolData>& tools) const
+{
+    return tools.empty() ? 0U : tools.front().frameNumber;
 }
 
 void TrackingRecordingDialog::writeHeader(std::ofstream& file, const std::vector<ToolData>& tools) {
@@ -124,10 +150,8 @@ void TrackingRecordingDialog::writeToolDataToCSV(std::ofstream& file, const std:
 {
     if (tools.empty()) return;
 
-    // 每行以工具数量开头
     file << tools.size();
 
-    // 顺序写入每个工具的数据
     for (size_t i = 0; i < tools.size(); ++i) {
         file << "," << toolDataToCSVRow(tools[i]);
     }
@@ -148,18 +172,17 @@ std::string TrackingRecordingDialog::toolDataToCSVRow(const ToolData& toolData)
     if (toolData.transform.isMissing()) {
         ss << "Missing,,,,,,,,"; 
     } else {
-        ss << "Enabled," // 使用与 Vega.csv 一致的状态词
+        ss << "Enabled," 
            << toolData.transform.q0 << "," << toolData.transform.qx << ","
            << toolData.transform.qy << "," << toolData.transform.qz << ","
            << toolData.transform.tx << "," << toolData.transform.ty << ","
            << toolData.transform.tz << "," << toolData.transform.error;
     }
 
-    // 写入标志点数据
     ss << "," << toolData.markers.size();
     for (int i = 0; i < (int)toolData.markers.size(); i++) {
         const auto& marker = toolData.markers[i];
-        if (marker.status == 0x01 || marker.status == 0x02) { // Missing 或 OutOfVolume
+        if (marker.status == 0x01 || marker.status == 0x02) { 
             ss << ",Missing,,,";
         } else {
             ss << ",OK," << marker.x << "," << marker.y << "," << marker.z;
@@ -168,4 +191,3 @@ std::string TrackingRecordingDialog::toolDataToCSVRow(const ToolData& toolData)
 
     return ss.str();
 }
-
