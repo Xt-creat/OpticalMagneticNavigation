@@ -26,68 +26,69 @@ void OMCalibrate::LoadData(const std::string& path, int group)
 	std::string filename1 = path + "/Vega.csv";
 	std::string filename2 = path + "/Aurora.csv";
 	
-	M1_data.clear();
-	M2_data.clear();
+	tool1_data.clear();
+	tool2_data.clear();
 	EMSensor_data.clear();
 
-	ReadRecordData(this->M1_data, filename1, group, 10, 9);
-	Quat2Matrices(M1_data);
+	ReadRecordData(this->tool1_data, filename1, group, 10, 9);
+	Quat2Matrices(tool1_data);
 
-	ReadRecordData(this->M2_data, filename1, group, 10, 73);
-	Quat2Matrices(M2_data);
+	// 光学工具2改为读取 Vega.csv 中第二个光学工具块
+	ReadRecordData(this->tool2_data, filename1, group, 10, 41);
+	Quat2Matrices(tool2_data);
 
 	ReadRecordData(this->EMSensor_data, filename2, group, 10, 9);
 	Quat2Matrices(EMSensor_data);
 
-	saveTrackedDataToCsv(M1_data, path + "/Processed_M1.csv");
-	saveTrackedDataToCsv(M2_data, path + "/Processed_M2.csv");
+	saveTrackedDataToCsv(tool1_data, path + "/Processed_tool1.csv");
+	saveTrackedDataToCsv(tool2_data, path + "/Processed_tool2.csv");
 	saveTrackedDataToCsv(EMSensor_data, path + "/Processed_EMSensor.csv");
 
 	PrepareCalibration();
 
 	// 保存中间变换矩阵到 txt 文件
-	saveVectorMatToTxt(Marker1_2Vega, path + "/Marker1_2Vega.txt");
-	saveVectorMatToTxt(Marker2_2Vega, path + "/Marker2_2Vega.txt");
+	saveVectorMatToTxt(tool1_2Vega, path + "/tool1_2Vega.txt");
+	saveVectorMatToTxt(tool2_2Vega, path + "/tool2_2Vega.txt");
 	saveVectorMatToTxt(EMsensor_2Aurora, path + "/EMsensor_2Aurora.txt");
 	saveVectorMatToTxt(Aurora_2EMsensor, path + "/Aurora_2EMsensor.txt");
-	saveVectorMatToTxt(Marker2_2Marker1, path + "/Marker2_2Marker1.txt");
-	saveVectorMatToTxt(Marker1_2Marker2, path + "/Marker1_2Marker2.txt");
+	saveVectorMatToTxt(tool2_2tool1, path + "/tool2_2tool1.txt");
+	saveVectorMatToTxt(tool1_2tool2, path + "/tool1_2tool2.txt");
 }
 
 void OMCalibrate::PrepareCalibration()
 {
-	R_Marker1_2Vega.clear();
-	t_Marker1_2Vega.clear();
-	R_Marker2_2Vega.clear();
-	t_Marker2_2Vega.clear();
+	R_tool1_2Vega.clear();
+	t_tool1_2Vega.clear();
+	R_tool2_2Vega.clear();
+	t_tool2_2Vega.clear();
 	R_EMsensor_2Aurora.clear();
 	t_EMsensor_2Aurora.clear();
 
 	GetRt();
 
-	Marker1_2Vega.clear();
-	Marker2_2Vega.clear();
+	tool1_2Vega.clear();
+	tool2_2Vega.clear();
 	EMsensor_2Aurora.clear();
-	Vega_2Marker1.clear();
-	Vega_2Marker2.clear();
+	Vega_2tool1.clear();
+	Vega_2tool2.clear();
 	Aurora_2EMsensor.clear();
 
-	for (int i = 0; i < (int)R_Marker1_2Vega.size(); i++) {
-		Marker1_2Vega.push_back(createTransformationMatrix(R_Marker1_2Vega[i], t_Marker1_2Vega[i]));
-		if (i < (int)R_Marker2_2Vega.size())
-			Marker2_2Vega.push_back(createTransformationMatrix(R_Marker2_2Vega[i], t_Marker2_2Vega[i]));
+	for (int i = 0; i < (int)R_tool1_2Vega.size(); i++) {
+		tool1_2Vega.push_back(createTransformationMatrix(R_tool1_2Vega[i], t_tool1_2Vega[i]));
+		if (i < (int)R_tool2_2Vega.size())
+			tool2_2Vega.push_back(createTransformationMatrix(R_tool2_2Vega[i], t_tool2_2Vega[i]));
 		if (i < (int)R_EMsensor_2Aurora.size())
 			EMsensor_2Aurora.push_back(createTransformationMatrix(R_EMsensor_2Aurora[i], t_EMsensor_2Aurora[i]));
 	}
 
-	for (int i = 0; i < (int)Marker1_2Vega.size(); i++) {
+	for (int i = 0; i < (int)tool1_2Vega.size(); i++) {
 		cv::Mat invert_temp, invert_temp1, invert_temp2;
-		cv::invert(Marker1_2Vega[i], invert_temp, cv::DECOMP_SVD);
-		Vega_2Marker1.push_back(invert_temp);
+		cv::invert(tool1_2Vega[i], invert_temp, cv::DECOMP_SVD);
+		Vega_2tool1.push_back(invert_temp);
 
-		if (i < (int)Marker2_2Vega.size()) {
-			cv::invert(Marker2_2Vega[i], invert_temp1, cv::DECOMP_SVD);
-			Vega_2Marker2.push_back(invert_temp1);
+		if (i < (int)tool2_2Vega.size()) {
+			cv::invert(tool2_2Vega[i], invert_temp1, cv::DECOMP_SVD);
+			Vega_2tool2.push_back(invert_temp1);
 		}
 		if (i < (int)EMsensor_2Aurora.size()) {
 			cv::invert(EMsensor_2Aurora[i], invert_temp2, cv::DECOMP_SVD);
@@ -95,35 +96,35 @@ void OMCalibrate::PrepareCalibration()
 		}
 	}
 
-	Marker2_2Marker1.clear();
-	R_Marker2_2Marker1.clear();
-	t_Marker2_2Marker1.clear();
-	Marker1_2Marker2.clear();
+	tool2_2tool1.clear();
+	R_tool2_2tool1.clear();
+	t_tool2_2tool1.clear();
+	tool1_2tool2.clear();
 
-	for (int i = 0; i < (int)Marker1_2Vega.size(); i++) {
-		if (i >= (int)Vega_2Marker1.size() || i >= (int)Marker2_2Vega.size()) break;
-		cv::Mat Rt = Vega_2Marker1[i] * Marker2_2Vega[i];
+	for (int i = 0; i < (int)tool1_2Vega.size(); i++) {
+		if (i >= (int)Vega_2tool1.size() || i >= (int)tool2_2Vega.size()) break;
+		cv::Mat Rt = Vega_2tool1[i] * tool2_2Vega[i];
 		cv::Mat R = Rt(cv::Range(0, 3), cv::Range(0, 3));
 		cv::Mat t = Rt(cv::Range(0, 3), cv::Range(3, 4));
 
-		Marker2_2Marker1.push_back(Rt);
-		R_Marker2_2Marker1.push_back(R);
-		t_Marker2_2Marker1.push_back(t);
+		tool2_2tool1.push_back(Rt);
+		R_tool2_2tool1.push_back(R);
+		t_tool2_2tool1.push_back(t);
 
-		if (i < (int)Vega_2Marker2.size()) {
-			cv::Mat Rt2 = Vega_2Marker2[i] * Marker1_2Vega[i];
-			Marker1_2Marker2.push_back(Rt2);
+		if (i < (int)Vega_2tool2.size()) {
+			cv::Mat Rt2 = Vega_2tool2[i] * tool1_2Vega[i];
+			tool1_2tool2.push_back(Rt2);
 		}
 	}
 }
 
 void OMCalibrate::RemoveGroup(int index)
 {
-	if (index >= 0 && index < (int)M1_data.size()) {
-		M1_data.erase(M1_data.begin() + index);
+	if (index >= 0 && index < (int)tool1_data.size()) {
+		tool1_data.erase(tool1_data.begin() + index);
 	}
-	if (index >= 0 && index < (int)M2_data.size()) {
-		M2_data.erase(M2_data.begin() + index);
+	if (index >= 0 && index < (int)tool2_data.size()) {
+		tool2_data.erase(tool2_data.begin() + index);
 	}
 	if (index >= 0 && index < (int)EMSensor_data.size()) {
 		EMSensor_data.erase(EMSensor_data.begin() + index);
@@ -144,26 +145,26 @@ static double rotationMatrixToAngleError(const cv::Mat& rotationMatrix) {
 CalibrationError OMCalibrate::EvaluateCalibration()
 {
 	CalibrationError error = {0, 0, {}, {}};
-	if (Marker1_2Vega.empty() || EMsensor_2Marker1.empty() || EM_2Marker2.empty()) return error;
+	if (tool1_2Vega.empty() || EMsensor_2tool1.empty() || EM_2tool2.empty()) return error;
 
-	cv::Mat RecordMarker1_2EMsensor;
-	try { cv::invert(EMsensor_2Marker1, RecordMarker1_2EMsensor, cv::DECOMP_SVD); } catch (...) { return error; }
+	cv::Mat record_tool1_2EMsensor;
+	try { cv::invert(EMsensor_2tool1, record_tool1_2EMsensor, cv::DECOMP_SVD); } catch (...) { return error; }
 
-	for (int i = 0; i < (int)Marker1_2Vega.size(); i++) {
-		if (i >= (int)Marker2_2Vega.size() || i >= (int)EMsensor_2Aurora.size()) break;
-		if (Marker2_2Vega[i].empty() || EMsensor_2Aurora[i].empty()) continue;
+	for (int i = 0; i < (int)tool1_2Vega.size(); i++) {
+		if (i >= (int)tool2_2Vega.size() || i >= (int)EMsensor_2Aurora.size()) break;
+		if (tool2_2Vega[i].empty() || EMsensor_2Aurora[i].empty()) continue;
 
-		cv::Mat output_Marker1_2Vega = Marker2_2Vega[i] * EM_2Marker2 * EMsensor_2Aurora[i] * RecordMarker1_2EMsensor;
-		if (output_Marker1_2Vega.empty() || output_Marker1_2Vega.rows < 4) continue;
+		cv::Mat output_tool1_2Vega = tool2_2Vega[i] * EM_2tool2 * EMsensor_2Aurora[i] * record_tool1_2EMsensor;
+		if (output_tool1_2Vega.empty() || output_tool1_2Vega.rows < 4) continue;
 
-		Eigen::Vector3d tOut(output_Marker1_2Vega.at<double>(0, 3), output_Marker1_2Vega.at<double>(1, 3), output_Marker1_2Vega.at<double>(2, 3));
-		Eigen::Vector3d tTruth(Marker1_2Vega[i].at<double>(0, 3), Marker1_2Vega[i].at<double>(1, 3), Marker1_2Vega[i].at<double>(2, 3));
+		Eigen::Vector3d tOut(output_tool1_2Vega.at<double>(0, 3), output_tool1_2Vega.at<double>(1, 3), output_tool1_2Vega.at<double>(2, 3));
+		Eigen::Vector3d tTruth(tool1_2Vega[i].at<double>(0, 3), tool1_2Vega[i].at<double>(1, 3), tool1_2Vega[i].at<double>(2, 3));
 		
 		double distErr = (tOut - tTruth).norm();
 		error.translationErrors.push_back(distErr);
 
-		cv::Mat rOut = output_Marker1_2Vega(cv::Rect(0, 0, 3, 3));
-		cv::Mat rTruth = Marker1_2Vega[i](cv::Rect(0, 0, 3, 3));
+		cv::Mat rOut = output_tool1_2Vega(cv::Rect(0, 0, 3, 3));
+		cv::Mat rTruth = tool1_2Vega[i](cv::Rect(0, 0, 3, 3));
 		cv::Mat rOutInv;
 		cv::invert(rOut, rOutInv, cv::DECOMP_SVD);
 		error.rotationErrors.push_back(rotationMatrixToAngleError(rTruth * rOutInv));
@@ -178,7 +179,7 @@ CalibrationError OMCalibrate::EvaluateCalibration()
 
 void OMCalibrate::HandeyeCalibrate3()
 {
-	if (R_Marker2_2Marker1.empty() || R_EMsensor_2Aurora.empty()) return;
+	if (R_tool2_2tool1.empty() || R_EMsensor_2Aurora.empty()) return;
 
 	std::vector<cv::Mat> R_EM2EMS, t_EM2EMS;
 	for (int i = 0; i < (int)R_EMsensor_2Aurora.size(); i++) {
@@ -190,24 +191,24 @@ void OMCalibrate::HandeyeCalibrate3()
 
 	cv::Mat R_EM2M2, t_EM2M2, R_EMS2M1, t_EMS2M1;
 	try {
-		cv::calibrateRobotWorldHandEye(R_Marker2_2Marker1, t_Marker2_2Marker1, R_EM2EMS, t_EM2EMS,
+		cv::calibrateRobotWorldHandEye(R_tool2_2tool1, t_tool2_2tool1, R_EM2EMS, t_EM2EMS,
 			R_EM2M2, t_EM2M2, R_EMS2M1, t_EMS2M1, cv::CALIB_ROBOT_WORLD_HAND_EYE_SHAH);
 	} catch (...) { return; }
 
-	EM_2Marker2 = createTransformationMatrix(R_EM2M2, t_EM2M2);
-	EMsensor_2Marker1 = createTransformationMatrix(R_EMS2M1, t_EMS2M1);
-	cv::invert(EMsensor_2Marker1, Marker1_2EMsensor, cv::DECOMP_SVD);
+	EM_2tool2 = createTransformationMatrix(R_EM2M2, t_EM2M2);
+	EMsensor_2tool1 = createTransformationMatrix(R_EMS2M1, t_EMS2M1);
+	cv::invert(EMsensor_2tool1, tool1_2EMsensor, cv::DECOMP_SVD);
 }
 
 void OMCalibrate::GetRt()
 {
-	for (int i = 0; i < (int)this->M1_data.size();i++) {
-		R_Marker1_2Vega.push_back(this->M1_data[i].R);
-		t_Marker1_2Vega.push_back(cv::Mat(3, 1, CV_64F, this->M1_data[i].t).clone());
+	for (int i = 0; i < (int)this->tool1_data.size();i++) {
+		R_tool1_2Vega.push_back(this->tool1_data[i].R);
+		t_tool1_2Vega.push_back(cv::Mat(3, 1, CV_64F, this->tool1_data[i].t).clone());
 
-		if(i < (int)M2_data.size()) {
-			R_Marker2_2Vega.push_back(M2_data[i].R);
-			t_Marker2_2Vega.push_back(cv::Mat(3, 1, CV_64F, M2_data[i].t).clone());
+		if(i < (int)tool2_data.size()) {
+			R_tool2_2Vega.push_back(tool2_data[i].R);
+			t_tool2_2Vega.push_back(cv::Mat(3, 1, CV_64F, tool2_data[i].t).clone());
 		}
 		if(i < (int)EMSensor_data.size()) {
 			R_EMsensor_2Aurora.push_back(EMSensor_data[i].R);

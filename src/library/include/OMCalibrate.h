@@ -49,7 +49,7 @@ public:
 
 	void RemoveGroup(int index);
 
-	void HandeyeCalibrate();  //求解两次AX=XB，计算M12EMS和EM2M2
+	void HandeyeCalibrate();  //求解两次AX=XB，计算tool1_2EMsensor和EM_2tool2
 
 	void HandeyeCalibrate1();
 
@@ -67,41 +67,41 @@ public:
 
 
 //private:
-	std::vector<cv::Mat> R_Marker1_2Vega;     //读取数据存储
-	std::vector<cv::Mat> t_Marker1_2Vega;
-	std::vector<cv::Mat> Marker1_2Vega;
-	std::vector<cv::Mat> Vega_2Marker1;
+	std::vector<cv::Mat> R_tool1_2Vega;     //读取数据存储
+	std::vector<cv::Mat> t_tool1_2Vega;
+	std::vector<cv::Mat> tool1_2Vega;
+	std::vector<cv::Mat> Vega_2tool1;
 
-	std::vector<cv::Mat> R_Marker2_2Vega;       
-	std::vector<cv::Mat> t_Marker2_2Vega;
-	std::vector<cv::Mat> Marker2_2Vega;
-	std::vector<cv::Mat> Vega_2Marker2;
+	std::vector<cv::Mat> R_tool2_2Vega;
+	std::vector<cv::Mat> t_tool2_2Vega;
+	std::vector<cv::Mat> tool2_2Vega;
+	std::vector<cv::Mat> Vega_2tool2;
 
 	std::vector<cv::Mat> R_EMsensor_2Aurora;
 	std::vector<cv::Mat> t_EMsensor_2Aurora;
 	std::vector<cv::Mat> EMsensor_2Aurora;
 	std::vector<cv::Mat> Aurora_2EMsensor;
 
-	std::vector<cv::Mat> R_Marker2_2Marker1;
-	std::vector<cv::Mat> t_Marker2_2Marker1;
-	std::vector<cv::Mat> Marker2_2Marker1;
+	std::vector<cv::Mat> R_tool2_2tool1;
+	std::vector<cv::Mat> t_tool2_2tool1;
+	std::vector<cv::Mat> tool2_2tool1;
 
-	std::vector<cv::Mat> Marker1_2Marker2;
+	std::vector<cv::Mat> tool1_2tool2;
 
 
-	cv::Mat R_EMsensor_2Marker1;  //待求转换矩阵
-	cv::Mat t_EMsensor_2Marker1;
-	cv::Mat EMsensor_2Marker1;
-	cv::Mat Marker1_2EMsensor;
-	cv::Mat R_EM_2Marker2;
-	cv::Mat t_EM_2Marker2;
-	cv::Mat EM_2Marker2;
+	cv::Mat R_EMsensor_2tool1;  //待求转换矩阵
+	cv::Mat t_EMsensor_2tool1;
+	cv::Mat EMsensor_2tool1;
+	cv::Mat tool1_2EMsensor;
+	cv::Mat R_EM_2tool2;
+	cv::Mat t_EM_2tool2;
+	cv::Mat EM_2tool2;
 	cv::Mat R_Aurora2Vega;
 	cv::Mat t_Aurora2Vega;
 	cv::Mat Aurora2Vega;
 
-	std::vector<TrackedData> M1_data;
-	std::vector<TrackedData> M2_data;
+	std::vector<TrackedData> tool1_data;
+	std::vector<TrackedData> tool2_data;
 	std::vector<TrackedData> EMSensor_data;
 
 	void ReadRecordData(std::vector<TrackedData>& m_data, const std::string& filename, int groups,int interval, int start);

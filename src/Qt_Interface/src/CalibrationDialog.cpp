@@ -118,11 +118,11 @@ void CalibrationDialog::StaticCalibrateCollection()
 		std::vector<ToolData> enabledTools1 = m_lastOData;
 		std::vector<ToolData> enabledTools2 = m_lastMData;
 
-		bool allValid = (enabledTools1.size() >= 3) && (!enabledTools2.empty());
+		bool allValid = (enabledTools1.size() >= 2) && (!enabledTools2.empty());
 		
 		if (allValid) {
 			if (enabledTools1[0].transform.isMissing() || 
-				enabledTools1[2].transform.isMissing() || 
+				enabledTools1[1].transform.isMissing() || 
 				enabledTools2[0].transform.isMissing()) {
 				allValid = false;
 			}
@@ -216,7 +216,7 @@ void CalibrationDialog::StaticCalibrateCollection()
 
 /**
 * @brief Returns a string representation of the data in CSV format.
-* @details The CSV format is: "Frame#,ToolHandle,Face,TransformStatus,q0,qx,qy,qz,tx,ty,tz,error,#markers,[Marker1:status,x,y,z],[Marker2..."
+ * @details The CSV format is: "Frame#,ToolHandle,Face,TransformStatus,q0,qx,qy,qz,tx,ty,tz,error,#markers,[tool_marker1:status,x,y,z],[tool_marker2..."
 */
 std::string CalibrationDialog::toolDataToCSV(const ToolData& toolData)
 {
@@ -275,7 +275,7 @@ void CalibrationDialog::Calibrationcalculate() {
 	
 	// 追踪原始索引
 	std::vector<int> activeGroupIds;
-	for (int i = 0; i < (int)OMC.M1_data.size(); ++i) activeGroupIds.push_back(i + 1);
+	for (int i = 0; i < (int)OMC.tool1_data.size(); ++i) activeGroupIds.push_back(i + 1);
 	std::vector<std::vector<int>> iterationGroupIdsHistory; // 记录每次迭代剩下的 ID
 	std::vector<int> removedIds;
 
@@ -286,7 +286,7 @@ void CalibrationDialog::Calibrationcalculate() {
 		// 执行当前数据集的标定
 		OMC.HandeyeCalibrate3();
 
-		if (OMC.Marker1_2EMsensor.empty() || OMC.EM_2Marker2.empty()) {
+		if (OMC.tool1_2EMsensor.empty() || OMC.EM_2tool2.empty()) {
 			ui->label->setText(QString::fromLocal8Bit("<font color='red'>计算失败: 数据不足或解算异常</font>"));
 			ui->calculateButton->setEnabled(true);
 			return;
@@ -295,8 +295,8 @@ void CalibrationDialog::Calibrationcalculate() {
 		// 评估当前标定结果
 		CalibrationError currentError = OMC.EvaluateCalibration();
 		iterationErrors.push_back(currentError);
-		m12ems_history.push_back(OMC.Marker1_2EMsensor.clone());
-		em2m2_history.push_back(OMC.EM_2Marker2.clone());
+		m12ems_history.push_back(OMC.tool1_2EMsensor.clone());
+		em2m2_history.push_back(OMC.EM_2tool2.clone());
 
 		// 如果不是最后一次迭代，且还有足够的数据，则剔除误差最大的一组
 		if (iter < maxIterations && currentError.translationErrors.size() > 3) {
@@ -363,12 +363,12 @@ void CalibrationDialog::Calibrationcalculate() {
 
 		// C. 最终矩阵
 		file << ">>> Final Calibration Matrices:\n\n";
-		file << "Marker1_2EMsensor:\n";
+		file << "tool1_2EMsensor:\n";
 		for (int r = 0; r < 4; r++) {
 			for (int c = 0; c < 4; c++) file << std::setw(12) << m12ems_history.back().at<double>(r, c) << " ";
 			file << "\n";
 		}
-		file << "\nEM_2Marker2:\n";
+		file << "\nEM_2tool2:\n";
 		for (int r = 0; r < 4; r++) {
 			for (int c = 0; c < 4; c++) file << std::setw(12) << em2m2_history.back().at<double>(r, c) << " ";
 			file << "\n";
@@ -377,8 +377,8 @@ void CalibrationDialog::Calibrationcalculate() {
 	}
 
 	// 4. 更新最终矩阵文件供主界面加载
-	saveMatToTxt(OMC.Marker1_2EMsensor, "Marker1_2EMsensor.txt");
-	saveMatToTxt(OMC.EM_2Marker2, "EM_2Marker2.txt");
+	saveMatToTxt(OMC.tool1_2EMsensor, "tool1_2EMsensor.txt");
+	saveMatToTxt(OMC.EM_2tool2, "EM_2tool2.txt");
 
 	// 5. 弹出结果反馈
 	const CalibrationError& initial = iterationErrors.front();

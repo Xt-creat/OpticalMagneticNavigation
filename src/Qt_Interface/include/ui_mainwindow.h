@@ -11,7 +11,6 @@
 
 #include <QtCore/QVariant>
 #include <QtWidgets/QApplication>
-#include <QtWidgets/QComboBox>
 #include <QtWidgets/QHBoxLayout>
 #include <QtWidgets/QLabel>
 #include <QtWidgets/QLineEdit>
@@ -32,8 +31,7 @@ public:
     QHBoxLayout *horizontalLayout_3;
     QPushButton *m_SelectSavePathBtn;
     QLineEdit *m_DisplaySavePathLineEdit;
-    QComboBox *m_DisplayModeComboBox;
-    QComboBox *m_SizeComboBox;
+    QLabel *m_SampleFreqLabel;
     QSpinBox *m_SleepSpinBox;
     QVBoxLayout *verticalLayout_2;
     QVBoxLayout *verticalLayout_3;
@@ -84,19 +82,10 @@ public:
 
         horizontalLayout_3->addWidget(m_DisplaySavePathLineEdit);
 
-        m_DisplayModeComboBox = new QComboBox(centralWidget);
-        m_DisplayModeComboBox->addItem(QString());
-        m_DisplayModeComboBox->addItem(QString());
-        m_DisplayModeComboBox->setObjectName(QString::fromUtf8("m_DisplayModeComboBox"));
+        m_SampleFreqLabel = new QLabel(centralWidget);
+        m_SampleFreqLabel->setObjectName(QString::fromUtf8("m_SampleFreqLabel"));
 
-        horizontalLayout_3->addWidget(m_DisplayModeComboBox);
-
-        m_SizeComboBox = new QComboBox(centralWidget);
-        m_SizeComboBox->addItem(QString());
-        m_SizeComboBox->addItem(QString());
-        m_SizeComboBox->setObjectName(QString::fromUtf8("m_SizeComboBox"));
-
-        horizontalLayout_3->addWidget(m_SizeComboBox);
+        horizontalLayout_3->addWidget(m_SampleFreqLabel);
 
         m_SleepSpinBox = new QSpinBox(centralWidget);
         m_SleepSpinBox->setObjectName(QString::fromUtf8("m_SleepSpinBox"));
@@ -226,12 +215,7 @@ public:
     {
         MainWindow->setWindowTitle(QApplication::translate("MainWindow", "MainWindow", nullptr));
         m_SelectSavePathBtn->setText(QApplication::translate("MainWindow", "\351\200\211\346\213\251\344\277\235\345\255\230\350\267\257\345\276\204", nullptr));
-        m_DisplayModeComboBox->setItemText(0, QApplication::translate("MainWindow", "\345\215\225\346\240\217", nullptr));
-        m_DisplayModeComboBox->setItemText(1, QApplication::translate("MainWindow", "\345\217\214\346\240\217", nullptr));
-
-        m_SizeComboBox->setItemText(0, QApplication::translate("MainWindow", "\346\234\200\344\275\263", nullptr));
-        m_SizeComboBox->setItemText(1, QApplication::translate("MainWindow", "\345\205\250\345\261\217", nullptr));
-
+        m_SampleFreqLabel->setText(QApplication::translate("MainWindow", "\351\207\207\351\233\206\351\242\221\347\216\207", nullptr));
         m_systemstatus->setText(QApplication::translate("MainWindow", "\347\263\273\347\273\237\347\212\266\346\200\201", nullptr));
         m_OdataLabel->setText(QApplication::translate("MainWindow", "\345\205\211\345\255\246\346\225\260\346\215\256", nullptr));
         m_MdataLabel->setText(QApplication::translate("MainWindow", "\347\224\265\347\243\201\346\225\260\346\215\256", nullptr));

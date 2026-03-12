@@ -1,4 +1,4 @@
-﻿#include <iostream>
+#include <iostream>
 #include <QPushButton>
 #include <QComboBox>
 #include <QDir>
@@ -36,11 +36,11 @@ MainWindow::MainWindow(QWidget *parent) :
 {
 	ui->setupUi(this);
 
-	// 设置标签的基本属性
+	// Configure data labels.
 	auto setupDataLabel = [](QLabel* label) {
 		label->setMinimumHeight(100);
 		label->setWordWrap(true);
-		label->setTextInteractionFlags(Qt::TextSelectableByMouse); // 允许选择/复制文本
+		label->setTextInteractionFlags(Qt::TextSelectableByMouse);
 		label->setAlignment(Qt::AlignTop | Qt::AlignLeft);
 		label->setStyleSheet(
 			"QLabel {"
@@ -53,17 +53,16 @@ MainWindow::MainWindow(QWidget *parent) :
 			"  font-weight: bold;"
 			"  color: #495057;"
 			"  line-height: 1.2;"
-			"}"
-		);
+			"}");
 	};
 
 	setupDataLabel(ui->m_OdataLabel);
-	ui->m_OdataLabel->setMinimumHeight(200); // 调大光学数据的最小高度
+	ui->m_OdataLabel->setMinimumHeight(200);
 	
 	setupDataLabel(ui->m_MdataLabel);
 	setupDataLabel(ui->m_FusionLabel);
 
-	ui->m_systemstatus->setMaximumHeight(40); // 限制系统状态区域的纵向尺寸
+	ui->m_systemstatus->setMaximumHeight(40);
 	ui->m_systemstatus->setStyleSheet(
 		"QLabel {"
 		"  font-weight: bold;"
@@ -73,24 +72,28 @@ MainWindow::MainWindow(QWidget *parent) :
 		"}"
 	);
 
-	connect(ui->m_SelectSavePathBtn, &QPushButton::clicked, this, &MainWindow::OnSelectBtnClicked);     //选择数据存储路径
+	connect(ui->m_SelectSavePathBtn, &QPushButton::clicked, this, &MainWindow::OnSelectBtnClicked);
 	m_NDIWorker = new NDIWorker;
 	ui->m_LinkBtn->setCheckable(false);
-	connect(ui->m_LinkBtn, &QPushButton::clicked, m_NDIWorker, &NDIWorker::LinkNDI);                     //连接设备
+	connect(ui->m_LinkBtn, &QPushButton::clicked, m_NDIWorker, &NDIWorker::LinkNDI);
 	connect(m_NDIWorker, &NDIWorker::linkStatusChanged, this, &MainWindow::updateSystemStatus);
-	connect(ui->m_CalibrateBtn, &QPushButton::clicked, this, &MainWindow::OnStartBtnClicked);               //系统标定
+	connect(ui->m_CalibrateBtn, &QPushButton::clicked, this, &MainWindow::OnStartBtnClicked);
 	
 	ui->m_TrackingBtn->setCheckable(true);
-	connect(ui->m_TrackingBtn, &QPushButton::clicked, this, &MainWindow::OnStartTracking);                 //开始/停止跟踪
+	connect(ui->m_TrackingBtn, &QPushButton::clicked, this, &MainWindow::OnStartTracking);
 	
-	connect(ui->m_StopBtn, &QPushButton::clicked, this, &MainWindow::OnStopTracking);             //数据记录
-	ui->m_StopBtn->setText(QString::fromLocal8Bit("数据记录"));
+	connect(ui->m_StopBtn, &QPushButton::clicked, this, &MainWindow::OnStopTracking);
+	ui->m_StopBtn->setText("Record Data");
 
-	connect(ui->m_DisplayBtn, &QPushButton::clicked, this, &MainWindow::onDisplayBtnClicked);     //可视化
+	connect(ui->m_DisplayBtn, &QPushButton::clicked, this, &MainWindow::onDisplayBtnClicked);
 
 	ui->m_DisplaySavePathLineEdit->setEnabled(false);
 
-	ui->m_SleepSpinBox->setValue(30);
+	// Sampling frequency config: 10-30 Hz, default 10 Hz
+	ui->m_SleepSpinBox->setRange(10, 30);
+	ui->m_SleepSpinBox->setValue(10);
+	ui->m_SleepSpinBox->setSuffix(" Hz");
+	ui->m_SleepSpinBox->setToolTip("Sampling frequency (10-30 Hz)");
 	
 }
 
@@ -127,14 +130,14 @@ MainWindow::~MainWindow()
 void MainWindow::OnStartBtnClicked()
 {
 	if (!m_connected) {
-		QMessageBox::warning(this, QString::fromLocal8Bit("警告"), QString::fromLocal8Bit("设备未连接，请先连接设备！"));
+		QMessageBox::warning(this, "Warning", "Device is not connected. Please connect first.");
 		return;
 	}
 
-	// 检查是否正在跟踪，标定需要实时数据
+	// Calibration requires live tracking data.
 	bool isTracking = (thread1 && thread1->isRunning()) || (thread2 && thread2->isRunning());
 	if (!isTracking) {
-		QMessageBox::warning(this, QString::fromLocal8Bit("警告"), QString::fromLocal8Bit("请先开启“跟踪”模式后再进行标定数据采集！"));
+		QMessageBox::warning(this, "Warning", "Please start tracking before calibration data acquisition.");
 		return;
 	}
 
@@ -144,7 +147,7 @@ void MainWindow::OnStartBtnClicked()
 		connect(m_calibrationDialog, &QObject::destroyed, [this]() {
 			m_calibrationDialog = nullptr;
 		});
-		m_calibrationDialog->show(); // 非模态显示，这样主界面依然可以操作和刷新
+		m_calibrationDialog->show();
 	}
 	m_calibrationDialog->raise();
 	m_calibrationDialog->activateWindow();
@@ -169,7 +172,7 @@ void MainWindow::updateSystemStatus(bool isConnected) {
 void MainWindow::OnStartTracking()
 {
 	if (!m_connected) {
-		ui->m_systemstatus->setText(QString::fromLocal8Bit("设备未连接"));
+		ui->m_systemstatus->setText("Device not connected");
 		ui->m_systemstatus->setStyleSheet("color: #dc3545; font-weight: bold; font-size: 18px;");
 		ui->m_TrackingBtn->setChecked(false);
 		return;
@@ -193,8 +196,10 @@ void MainWindow::startTrackingThreads()
 		displayWidget->startRealtimeAnimation();
 	}
 
-	deviceReader1 = new DeviceReader(1, 100); 
-	deviceReader2 = new DeviceReader(2, 100); 
+	const int sampleFreqHz = ui->m_SleepSpinBox->value();
+	const int updateIntervalMs = 1000 / sampleFreqHz;
+	deviceReader1 = new DeviceReader(1, updateIntervalMs);
+	deviceReader2 = new DeviceReader(2, updateIntervalMs);
 	
 	thread1 = new QThread(this);
 	deviceReader1->moveToThread(thread1);
@@ -209,9 +214,9 @@ void MainWindow::startTrackingThreads()
 	thread1->start();
 	thread2->start();
 
-	ui->m_systemstatus->setText(QString::fromLocal8Bit("跟踪中..."));
+	ui->m_systemstatus->setText("Tracking...");
 	ui->m_systemstatus->setStyleSheet("color: #28a745; font-weight: bold; font-size: 18px;");
-	ui->m_TrackingBtn->setText(QString::fromLocal8Bit("停止跟踪"));
+	ui->m_TrackingBtn->setText("Stop Tracking");
 }
 
 void MainWindow::stopTrackingThreads()
@@ -247,15 +252,15 @@ void MainWindow::stopTrackingThreads()
 	O_capi.stopTracking();
 	M_capi.stopTracking();
 
-	ui->m_systemstatus->setText(QString::fromLocal8Bit("跟踪已停止"));
+	ui->m_systemstatus->setText("Tracking stopped");
 	ui->m_systemstatus->setStyleSheet("color: #fd7e14; font-weight: bold; font-size: 18px;");
-	ui->m_TrackingBtn->setText(QString::fromLocal8Bit("开始跟踪"));
+	ui->m_TrackingBtn->setText("Start Tracking");
 }
 
 void MainWindow::OnStopTracking() {
-	// 此函数现在对应 UI 上的“数据记录”按钮 (m_StopBtn)
+	// This slot handles the data recording button.
 	if (!((thread1 && thread1->isRunning()) || (thread2 && thread2->isRunning()))) {
-		QMessageBox::information(this, QString::fromLocal8Bit("提示"), QString::fromLocal8Bit("请先开启“跟踪”模式后再进行数据记录！"));
+		QMessageBox::information(this, "Info", "Please start tracking before recording data.");
 		return;
 	}
 
@@ -283,9 +288,9 @@ void MainWindow::updateODataLabel(const std::vector<ToolData>& tools)
 	}
 
 	QString header = QString("<div style='font-size: 18px; font-weight: bold; color: #495057; margin-bottom: 10px;'>%1</div>")
-		.arg(QString::fromLocal8Bit("光学数据"));
+		.arg("Optical Data");
 	QString fusionHeader = QString("<div style='font-size: 18px; font-weight: bold; color: #495057; margin-bottom: 10px;'>%1</div>")
-		.arg(QString::fromLocal8Bit("融合数据"));
+		.arg("Fusion Data");
 
 	if (tools.empty()) {
 		ui->m_OdataLabel->setText(header + "<b style='color: #dc3545;'>O: No Tools Detected</b>");
@@ -325,20 +330,20 @@ void MainWindow::updateODataLabel(const std::vector<ToolData>& tools)
 		.arg(statusText)
 		.arg(dataText);
 
-		// 只要第一个工具(通常是标准针)在线，就更新可视化
+		// Update visualization if the first tool is valid.
 		if (i == 0 && transform.toolHandle == 1 && !transform.isMissing()) {
 			F_text = fusionHeader + O_text.mid(header.length()) + "</div>";
 
 		if (displayWidget) {
 			vtkSmartPointer<vtkTransform> ndiTransform = vtkSmartPointer<vtkTransform>::New();
 			
-			// 1. 世界坐标系对齐 (将 VTK 空间旋转到符合 NDI 的习惯)
+			// 1) World axis alignment
 			ndiTransform->RotateX(-90.0);
 
-			// 2. 坐标系映射 (核心：通过旋转实现 ty, -tx, tz 的映射效果，并同步旋转轴)
+			// 2) Coordinate mapping
 			ndiTransform->RotateZ(-90.0);
 
-			// 3. 应用原始 NDI 数据 (不进行手动交换)
+			// 3) Apply raw NDI data
 			ndiTransform->Translate(transform.tx, transform.ty, transform.tz);
 
 			double angle = 0.0;
@@ -357,39 +362,40 @@ void MainWindow::updateODataLabel(const std::vector<ToolData>& tools)
 	}
 	O_text += "</div>";
 
-	// 如果第一个工具丢失，尝试 Fusion 逻辑
+	// Try fusion logic when first tool is missing.
 	if (tools[0].transform.isMissing()) {
-		// 安全检查：确保 M_data 已经初始化，且 O_data 至少包含三个工具（需使用 Otool3 作为参考）
-		if (M_data.empty() || O_data.size() < 3) {
+		// Safety check before fusion.
+		if (M_data.empty() || O_data.size() < 2) {
 			F_text = fusionHeader + "<i style='color: #6c757d; font-size:14px;'>Fusion: Waiting for more tools...</i>";
 		}
 		else {
-			cv::Mat Marker1_2EMsensor;
-			loadMatFromTxt("Marker1_2EMsensor.txt", Marker1_2EMsensor);
-			cv::Mat EM_2Marker2;
-			loadMatFromTxt("EM_2Marker2.txt", EM_2Marker2);
+			cv::Mat tool1_2EMsensor;
+			loadMatFromTxt("tool1_2EMsensor.txt", tool1_2EMsensor);
 
-			if (Marker1_2EMsensor.empty() || EM_2Marker2.empty()) {
+			cv::Mat EM_2tool2;
+			loadMatFromTxt("EM_2tool2.txt", EM_2tool2);
+
+			if (tool1_2EMsensor.empty() || EM_2tool2.empty()) {
 				F_text = "<b style='color: #dc3545;'>Fusion: Calibration files error!</b>";
 			}
 			else {
 				const ToolData& data_Mtool = M_data[0];
-				const Transform& transform_Mtool = data_Mtool.transform;      //包含实时EMsensor_2Aurora (q0,qx,qy,qz,tx,ty,tz)
-				const ToolData& data_Otool3 = O_data[2];
-				const Transform& transform_Otool3 = data_Otool3.transform;    //包含实时Marker2_2Vega (q0,qx,qy,qz,tx,ty,tz)
+				const Transform& transform_Mtool = data_Mtool.transform;
+				const ToolData& data_Otool2 = O_data[1];
+				const Transform& transform_Otool2 = data_Otool2.transform;
 
 				cv::Mat EMsensor_2Aurora = transformToMatrix(transform_Mtool);
-				cv::Mat Marker2_2Vega = transformToMatrix(transform_Otool3);
+				cv::Mat tool2_2Vega = transformToMatrix(transform_Otool2);
 
-				// 检查生成的变换矩阵是否有效
-				if (EMsensor_2Aurora.empty() || Marker2_2Vega.empty()) {
+				// Validate generated transform matrices.
+				if (EMsensor_2Aurora.empty() || tool2_2Vega.empty()) {
 					F_text = "<b style='color: #dc3545;'>Fusion: Transform matrix error!</b>";
 				}
 				else {
-					cv::Mat output_Marker1_2Vega = Marker2_2Vega * EM_2Marker2 * EMsensor_2Aurora * Marker1_2EMsensor;
+					cv::Mat output_tool1_2Vega = tool2_2Vega * EM_2tool2 * EMsensor_2Aurora * tool1_2EMsensor;
 
 					double q0, qx, qy, qz, tx, ty, tz;
-					matrixToTransform(output_Marker1_2Vega, q0, qx, qy, qz, tx, ty, tz);
+					matrixToTransform(output_tool1_2Vega, q0, qx, qy, qz, tx, ty, tz);
 
 					F_text = fusionHeader + QString(
 						"<div style='border-left: 5px solid #007bff; padding-left: 8px;'>"
@@ -408,13 +414,13 @@ void MainWindow::updateODataLabel(const std::vector<ToolData>& tools)
 					if (displayWidget) {
 						vtkSmartPointer<vtkTransform> ndiTransform = vtkSmartPointer<vtkTransform>::New();
 
-						// 1. 世界对齐
+						// 1) World alignment
 						ndiTransform->RotateX(-90.0);
 
-						// 2. 坐标映射
+						// 2) Coordinate mapping
 						ndiTransform->RotateZ(-90.0);
 
-						// 3. 原始数据
+						// 3) Raw data
 						ndiTransform->Translate(tx, ty, tz);
 
 						double angle = 0.0;
@@ -434,11 +440,11 @@ void MainWindow::updateODataLabel(const std::vector<ToolData>& tools)
 		}
 	}
 
-	// 使用 setText 设置 HTML 文本
+	// Apply formatted HTML to labels.
 	ui->m_OdataLabel->setText(O_text);
 	ui->m_FusionLabel->setText(F_text);
 
-	//追加写到日志文件
+	// Append to log file.
 	QFile file("tracking_log.txt");
 	if (file.open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text)) {
 		QTextStream out(&file);
@@ -462,13 +468,13 @@ void MainWindow::updateMDataLabel(const std::vector<ToolData>& tools) {
 	}
 
 	QString header = QString("<div style='font-size: 18px; font-weight: bold; color: #495057; margin-bottom: 10px;'>%1</div>")
-		.arg(QString::fromLocal8Bit("电磁数据"));
+		.arg("EM Data");
 
 	QString text = header + "<div style='font-family: Segoe UI, sans-serif;'>";
 	for (size_t i = 0; i < tools.size(); ++i) {
 		const ToolData& data = tools[i];
 		const Transform& transform = data.transform;
-		QString statusColor = transform.isMissing() ? "#dc3545" : "#17a2b8"; // 电磁用青蓝色区分
+		QString statusColor = transform.isMissing() ? "#dc3545" : "#17a2b8";
 		QString statusText = transform.isMissing() ? "Missing" : "Normal";
 
 		QString dataText = "";
@@ -503,10 +509,10 @@ void MainWindow::onDisplayBtnClicked()
 {
 	if (!displayWidget)
 	{
-		displayWidget = new DisplayWidget(nullptr); // 独立窗口
+		displayWidget = new DisplayWidget(nullptr);
 		displayWidget->setAttribute(Qt::WA_DeleteOnClose);
 
-		// 窗口关闭后把指针清空，避免悬空
+		// Clear pointer after window is closed.
 		connect(displayWidget, &QObject::destroyed, [this]() {
 			displayWidget = nullptr;
 			});
@@ -516,28 +522,28 @@ void MainWindow::onDisplayBtnClicked()
 	displayWidget->raise();
 	displayWidget->activateWindow();
 
-	 // 使用相对路径或检查文件是否存在
+	 // Use relative path and check file existence.
 	 QString modelPath = QCoreApplication::applicationDirPath() + "/tools/ToolScribing2.stl";
 	 if (!QFile::exists(modelPath)) {
-		 // 如果相对路径不存在，尝试原始硬编码路径作为兜底，但给出警告
+		 // Fallback to hard-coded path if needed.
 		 modelPath = "D:/Optomagnetic-tracking/OpticalMagneticNavigation/tools/ToolScribing2.stl";
 	 }
 	 
 	displayWidget->loadSTLModel(modelPath.toStdString());
 
-	// 如果当前已经在跟踪中，新打开的显示窗口也要启动动画刷新
+	// If tracking is active, start rendering updates for new window.
 	if ((thread1 && thread1->isRunning()) || (thread2 && thread2->isRunning())) {
 		displayWidget->startRealtimeAnimation();
 	}
 
-	//不启动动画刷新，除非 OnStartTracking() 调用
+	// Do not auto-start animation unless tracking starts.
 }
 
 
 
 void MainWindow::OnSelectBtnClicked()
 {
-	QString selectedPath = QFileDialog::getExistingDirectory(this, tr("选择数据保存路径"),
+	QString selectedPath = QFileDialog::getExistingDirectory(this, tr("Select data save path"),
 		"", QFileDialog::ShowDirsOnly | QFileDialog::DontResolveSymlinks);
 	if (!selectedPath.isEmpty()) {
 		m_savePath = selectedPath;
@@ -567,16 +573,15 @@ void MainWindow::quaternionToEuler(double w, double x, double y, double z,
 
 void MainWindow::loadMatFromTxt(const std::string &filename, cv::Mat &mat)
 {
-    QString fullPath = m_savePath + "/" + QString::fromStdString(filename); // 拼接完整路径
-    // 打开文件
-    std::ifstream file(fullPath.toStdString()); // 使用完整路径打开文件
+    QString fullPath = m_savePath + "/" + QString::fromStdString(filename);
+    std::ifstream file(fullPath.toStdString());
     if (!file.is_open()) {
-        std::cerr << "无法打开文件: " << fullPath.toStdString() << std::endl; // 打印完整路径
-        mat = cv::Mat(); // 确保返回空矩阵
+        std::cerr << "Cannot open file: " << fullPath.toStdString() << std::endl;
+        mat = cv::Mat();
         return;
     }
 
-    std::vector<std::vector<double>> tempData; // 临时存储数据
+    std::vector<std::vector<double>> tempData;
 
     std::string line;
     while (std::getline(file, line)) {
@@ -591,28 +596,28 @@ void MainWindow::loadMatFromTxt(const std::string &filename, cv::Mat &mat)
         }
     }
 
-    // 检查是否有数据，防止 tempData[0] 崩溃
+    // Check data validity.
     if (tempData.empty() || tempData[0].empty()) {
-        std::cerr << "文件内容为空或格式错误: " << fullPath.toStdString() << std::endl;
+        std::cerr << "Empty file or invalid format: " << fullPath.toStdString() << std::endl;
         mat = cv::Mat();
         file.close();
         return;
     }
 
-    // 将数据转换为cv::Mat
+    // Convert parsed data to cv::Mat.
     int rows = (int)tempData.size();
     int cols = (int)tempData[0].size();
     mat = cv::Mat(rows, cols, CV_64F);
 
     for (int i = 0; i < rows; ++i) {
-        // 确保每一列的大小一致，防止不规则数据导致崩溃
+        // Guard against ragged rows.
         for (int j = 0; j < (int)tempData[i].size() && j < cols; ++j) {
             mat.at<double>(i, j) = tempData[i][j];
         }
     }
 
     file.close();
-    //std::cout << "数据已成功加载到 cv::Mat 中。" << std::endl;
+    //std::cout << "Loaded data to cv::Mat." << std::endl;
 }
 
 
@@ -648,7 +653,7 @@ cv::Mat MainWindow::transformToMatrix(const Transform& transform_O2) {
 
 
 
-// 从旋转矩阵转换为四元数
+// Convert rotation matrix to quaternion.
 void MainWindow::rotationMatrixToQuaternion(const cv::Mat& R, double& q0, double& qx, double& qy, double& qz)
 {
 	double trace = R.at<double>(0, 0) + R.at<double>(1, 1) + R.at<double>(2, 2);
@@ -685,7 +690,7 @@ void MainWindow::rotationMatrixToQuaternion(const cv::Mat& R, double& q0, double
 	}
 }
 
-// 从变换矩阵提取四元数和位移
+// Extract quaternion and translation from transform matrix.
 void MainWindow::matrixToTransform(const cv::Mat& transformMat, double& q0, double& qx, double& qy, double& qz, double& tx, double& ty, double& tz)
 {
 	
@@ -710,7 +715,7 @@ void MainWindow::matrixToTransform(const cv::Mat& transformMat, double& q0, doub
 //	{
 //		QMessageBox msgBox;
 //		msgBox.setStyleSheet("background-color:white");
-//		msgBox.setText(QString::fromLocal8Bit("采集点过少"));
+//		msgBox.setText("Too few samples");
 //		msgBox.exec();
 //		return;
 //	}
@@ -739,10 +744,10 @@ void MainWindow::matrixToTransform(const cv::Mat& transformMat, double& q0, doub
 //		vtan.push_back(tan);
 //	}
 //	cv::vconcat(hrot, vrot);
-//	// 位移矩阵
+//	// Translation matrix
 //	cv::vconcat(vtan, tanV);
 //
-//	// 计算pos
+//	// Compute pos
 //	cv::Mat rotInv;
 //	cv::invert(vrot, rotInv, cv::DECOMP_SVD);
 //

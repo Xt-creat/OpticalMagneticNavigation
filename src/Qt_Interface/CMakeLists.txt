@@ -24,7 +24,6 @@ set(VTK_DIR "D:/Env/VTK9.4/install/lib/cmake/vtk-9.4")
 # 定义可执行文件目标
 add_executable(Qt_Interface ${SOURCES} ${HEADERS} ${UI_FILES})
 
-
 # 设置头文件路径
 target_include_directories(Qt_Interface PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
