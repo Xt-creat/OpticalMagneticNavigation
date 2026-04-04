@@ -110,6 +110,16 @@ public:
 
 	cv::Mat createTransformationMatrix(const cv::Mat& R, const cv::Mat& t);
 
+	// --- 新增: Proposed1 算法与优化支持函数 ---
+	// 执行完整的 Proposed1 标定流水线，返回被剔除的异常组别索引 (基于原始组号)
+	std::vector<int> ProposedCalibration(int num_to_skip = 5);
+
+	// 非线性优化 AX = XB (Gauss-Newton / LM 迭代)
+	cv::Mat solveAXXB_LM(const std::vector<cv::Mat>& A, const std::vector<cv::Mat>& B, const cv::Mat& initial_X);
+
+	// 基于 3D 虚拟点云的 SVD 基座优化 (计算 EM_2tool2)
+	cv::Mat optimizeBaseToGridSVD(const std::vector<cv::Mat>& tool1_2tool2_vec, const std::vector<cv::Mat>& EMsensor_2Aurora_vec, const cv::Mat& EMsensor_2tool1);
+
 
 };
 
